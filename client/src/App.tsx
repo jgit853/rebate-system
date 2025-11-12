@@ -9,6 +9,10 @@ import Dashboard from "./pages/admin/Dashboard";
 import Dealers from "./pages/admin/Dealers";
 import DealerDetail from "./pages/admin/DealerDetail";
 import Settlements from "./pages/admin/Settlements";
+import DealerLogin from "./pages/dealer/Login";
+import DealerDashboard from "./pages/dealer/Dashboard";
+import SetPassword from "./pages/dealer/SetPassword";
+import ChangePassword from "./pages/dealer/ChangePassword";
 
 function Router() {
   return (
@@ -18,6 +22,10 @@ function Router() {
       <Route path={"/admin/dealers"} component={Dealers} />
       <Route path={"/admin/dealers/:id"} component={DealerDetail} />
       <Route path={"/admin/settlements"} component={Settlements} />
+      <Route path={"/dealer/login"} component={DealerLogin} />
+      <Route path={"/dealer/dashboard"} component={DealerDashboard} />
+      <Route path={"/dealer/set-password"} component={SetPassword} />
+      <Route path={"/dealer/change-password"} component={ChangePassword} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

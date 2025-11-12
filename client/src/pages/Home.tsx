@@ -56,7 +56,12 @@ export default function Home() {
             <Button asChild className="w-full" size="lg">
               <a href={getLoginUrl()}>立即登录</a>
             </Button>
-            <div className="text-center">
+            <div className="flex justify-between text-center">
+              <Link href="/dealer/login">
+                <a className="text-sm text-muted-foreground hover:text-foreground">
+                  经销商登录 →
+                </a>
+              </Link>
               <Link href="/admin">
                 <a className="text-sm text-muted-foreground hover:text-foreground">
                   管理员入口 →

@@ -47,6 +47,7 @@ export default function Dealers() {
     name: "",
     type: "core" as "core" | "sub_dealer" | "terminal",
     parentDealerId: undefined as number | undefined,
+    username: "",
   });
 
   const filteredDealers = dealers?.filter((dealer) => {
@@ -67,6 +68,7 @@ export default function Dealers() {
         name: "",
         type: "core",
         parentDealerId: undefined,
+        username: "",
       });
       refetch();
     } catch (error) {
@@ -140,11 +142,25 @@ export default function Dealers() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="core">核心经销商</SelectItem>
-                      <SelectItem value="sub_dealer">下级经销商</SelectItem>
+                      <SelectItem value="core">核心绋销商</SelectItem>
+                      <SelectItem value="sub_dealer">下级绋销商</SelectItem>
                       <SelectItem value="terminal">终端客户</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div>
+                  <Label htmlFor="username">登录用户名(可选)</Label>
+                  <Input
+                    id="username"
+                    value={formData.username}
+                    onChange={(e) =>
+                      setFormData({ ...formData, username: e.target.value })
+                    }
+                    placeholder="如: dealer001"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    设置后经销商可使用此用户名登录
+                  </p>
                 </div>
               </div>
               <DialogFooter>

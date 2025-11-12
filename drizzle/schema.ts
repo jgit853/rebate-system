@@ -30,6 +30,11 @@ export const dealers = mysqlTable("dealers", {
   status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
   firstPaymentDate: date("firstPaymentDate"),
   userId: int("userId"),
+  // 经销商登录凭证
+  username: varchar("username", { length: 100 }).unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }),
+  passwordSetAt: timestamp("passwordSetAt"),
+  lastLoginAt: timestamp("lastLoginAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => ({

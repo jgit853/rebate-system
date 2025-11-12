@@ -18,6 +18,7 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import { generateAnnualSettlement } from "./settlement";
 import * as db from "./db";
+import { hashPassword, verifyPassword, generateDealerToken, verifyDealerToken } from "./auth";
 
 export const appRouter = router({
   system: systemRouter,
@@ -31,6 +32,161 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+  }),
+
+  // 经销商认证
+  dealerAuth: router({
+    // 经销商登录
+    login: publicProcedure
+      .input(
+        z.object({
+          username: z.string(),
+          password: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        const dealer = await database
+          .select()
+          .from(dealers)
+          .where(eq(dealers.username, input.username))
+          .limit(1);
+
+        if (dealer.length === 0) {
+          throw new Error("用户名或密码错误");
+        }
+
+        if (!dealer[0].passwordHash) {
+          throw new Error("请先设置密码");
+        }
+
+        const isValid = await verifyPassword(input.password, dealer[0].passwordHash);
+        if (!isValid) {
+          throw new Error("用户名或密码错误");
+        }
+
+        // 更新最后登录时间
+        await database
+          .update(dealers)
+          .set({ lastLoginAt: new Date() })
+          .where(eq(dealers.id, dealer[0].id));
+
+        const token = generateDealerToken(dealer[0].id, dealer[0].username!);
+
+        return {
+          success: true,
+          token,
+          dealer: {
+            id: dealer[0].id,
+            code: dealer[0].code,
+            name: dealer[0].name,
+            type: dealer[0].type,
+          },
+        };
+      }),
+
+    // 设置密码(首次或重置)
+    setPassword: publicProcedure
+      .input(
+        z.object({
+          username: z.string(),
+          newPassword: z.string().min(6),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        const dealer = await database
+          .select()
+          .from(dealers)
+          .where(eq(dealers.username, input.username))
+          .limit(1);
+
+        if (dealer.length === 0) {
+          throw new Error("用户名不存在");
+        }
+
+        const passwordHash = await hashPassword(input.newPassword);
+
+        await database
+          .update(dealers)
+          .set({
+            passwordHash,
+            passwordSetAt: new Date(),
+          })
+          .where(eq(dealers.id, dealer[0].id));
+
+        return { success: true };
+      }),
+
+    // 修改密码(需要旧密码)
+    changePassword: publicProcedure
+      .input(
+        z.object({
+          username: z.string(),
+          oldPassword: z.string(),
+          newPassword: z.string().min(6),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        const dealer = await database
+          .select()
+          .from(dealers)
+          .where(eq(dealers.username, input.username))
+          .limit(1);
+
+        if (dealer.length === 0 || !dealer[0].passwordHash) {
+          throw new Error("用户不存在或未设置密码");
+        }
+
+        const isValid = await verifyPassword(input.oldPassword, dealer[0].passwordHash);
+        if (!isValid) {
+          throw new Error("原密码错误");
+        }
+
+        const passwordHash = await hashPassword(input.newPassword);
+
+        await database
+          .update(dealers)
+          .set({
+            passwordHash,
+            passwordSetAt: new Date(),
+          })
+          .where(eq(dealers.id, dealer[0].id));
+
+        return { success: true };
+      }),
+
+    // 验证token并获取经销商信息
+    verifyToken: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const decoded = verifyDealerToken(input.token);
+        if (!decoded) {
+          throw new Error("无效的token");
+        }
+
+        const dealer = await db.getDealerById(decoded.dealerId);
+        if (!dealer) {
+          throw new Error("经销商不存在");
+        }
+
+        return {
+          dealer: {
+            id: dealer.id,
+            code: dealer.code,
+            name: dealer.name,
+            type: dealer.type,
+            username: dealer.username,
+          },
+        };
+      }),
   }),
 
   // 经销商管理
@@ -64,6 +220,7 @@ export const appRouter = router({
           name: z.string(),
           type: z.enum(["core", "sub_dealer", "terminal"]),
           parentDealerId: z.number().optional(),
+          username: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -75,6 +232,7 @@ export const appRouter = router({
           name: input.name,
           type: input.type,
           parentDealerId: input.parentDealerId,
+          username: input.username,
           status: "active",
         });
 
