@@ -1,11 +1,27 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { z } from "zod";
+import { getDb } from "./db";
+import { 
+  dealers, 
+  products, 
+  orders, 
+  orderItems, 
+  payments,
+  settlementPeriods,
+  annualSettlements,
+  marketFunds,
+  subCommissions,
+} from "../drizzle/schema";
+import { eq, and, desc } from "drizzle-orm";
+import { generateAnnualSettlement } from "./settlement";
+import * as db from "./db";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+  
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -17,12 +33,514 @@ export const appRouter = router({
     }),
   }),
 
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+  // 经销商管理
+  dealers: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllDealers();
+    }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getDealerById(input.id);
+      }),
+
+    getByType: protectedProcedure
+      .input(z.object({ type: z.enum(["core", "sub_dealer", "terminal"]) }))
+      .query(async ({ input }) => {
+        return await db.getDealersByType(input.type);
+      }),
+
+    getSubDealers: protectedProcedure
+      .input(z.object({ parentDealerId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getSubDealers(input.parentDealerId);
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          code: z.string(),
+          name: z.string(),
+          type: z.enum(["core", "sub_dealer", "terminal"]),
+          parentDealerId: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        await database.insert(dealers).values({
+          code: input.code,
+          name: input.name,
+          type: input.type,
+          parentDealerId: input.parentDealerId,
+          status: "active",
+        });
+
+        return { success: true };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          status: z.enum(["active", "inactive"]).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        const updateData: any = {};
+        if (input.name) updateData.name = input.name;
+        if (input.status) updateData.status = input.status;
+
+        await database
+          .update(dealers)
+          .set(updateData)
+          .where(eq(dealers.id, input.id));
+
+        return { success: true };
+      }),
+  }),
+
+  // 产品管理
+  products: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllProducts();
+    }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getProductById(input.id);
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          sku: z.string(),
+          name: z.string(),
+          spec: z.string(),
+          wholesalePrice: z.number(), // 前端传入分为单位
+          baseUnit: z.number(), // 前端传入0.01为单位
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        await database.insert(products).values({
+          sku: input.sku,
+          name: input.name,
+          spec: input.spec,
+          wholesalePrice: input.wholesalePrice,
+          baseUnit: input.baseUnit,
+        });
+
+        return { success: true };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          wholesalePrice: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        const updateData: any = {};
+        if (input.name) updateData.name = input.name;
+        if (input.wholesalePrice) updateData.wholesalePrice = input.wholesalePrice;
+
+        await database
+          .update(products)
+          .set(updateData)
+          .where(eq(products.id, input.id));
+
+        return { success: true };
+      }),
+  }),
+
+  // 结算周期管理
+  periods: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllPeriods();
+    }),
+
+    getActive: protectedProcedure.query(async () => {
+      return await db.getActivePeriod();
+    }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getPeriodById(input.id);
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string(),
+          startDate: z.string(),
+          endDate: z.string(),
+          type: z.enum(["annual", "quarterly", "custom"]),
+          isActive: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        await database.insert(settlementPeriods).values({
+          name: input.name,
+          startDate: new Date(input.startDate),
+          endDate: new Date(input.endDate),
+          type: input.type,
+          isActive: input.isActive || false,
+        });
+
+        return { success: true };
+      }),
+
+    setActive: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        // 先将所有周期设为非活跃
+        await database
+          .update(settlementPeriods)
+          .set({ isActive: false });
+
+        // 再将指定周期设为活跃
+        await database
+          .update(settlementPeriods)
+          .set({ isActive: true })
+          .where(eq(settlementPeriods.id, input.id));
+
+        return { success: true };
+      }),
+  }),
+
+  // 订单和回款管理
+  orders: router({
+    getByDealer: protectedProcedure
+      .input(
+        z.object({
+          dealerId: z.number(),
+          periodId: z.number().optional(),
+        })
+      )
+      .query(async ({ input }) => {
+        return await db.getOrdersByDealer(input.dealerId, input.periodId);
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          orderNumber: z.string(),
+          dealerId: z.number(),
+          orderDate: z.string(),
+          dueDate: z.string(),
+          type: z.enum(["normal", "gift", "special"]),
+          items: z.array(
+            z.object({
+              productId: z.number(),
+              quantity: z.number(),
+              price: z.number(), // 分为单位
+            })
+          ),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        // 计算订单总额
+        const totalAmount = input.items.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        );
+
+        // 插入订单
+        const orderResult = await database.insert(orders).values({
+          orderNumber: input.orderNumber,
+          dealerId: input.dealerId,
+          orderDate: new Date(input.orderDate),
+          dueDate: new Date(input.dueDate),
+          totalAmount,
+          type: input.type,
+          status: "pending",
+        });
+
+        // 获取插入的订单ID
+        const newOrders = await database
+          .select()
+          .from(orders)
+          .where(eq(orders.orderNumber, input.orderNumber))
+          .limit(1);
+
+        if (newOrders.length === 0) {
+          throw new Error("订单创建失败");
+        }
+
+        const orderId = newOrders[0].id;
+
+        // 插入订单明细
+        for (const item of input.items) {
+          await database.insert(orderItems).values({
+            orderId,
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.price,
+            itemAmount: item.price * item.quantity,
+          });
+        }
+
+        return { success: true, orderId };
+      }),
+
+    addPayment: protectedProcedure
+      .input(
+        z.object({
+          orderId: z.number(),
+          amount: z.number(), // 分为单位
+          paymentDate: z.string(),
+          method: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        await database.insert(payments).values({
+          orderId: input.orderId,
+          amount: input.amount,
+          paymentDate: new Date(input.paymentDate),
+          method: input.method,
+        });
+
+        // 更新订单状态
+        const order = await database
+          .select()
+          .from(orders)
+          .where(eq(orders.id, input.orderId))
+          .limit(1);
+
+        if (order.length > 0) {
+          const allPayments = await database
+            .select()
+            .from(payments)
+            .where(eq(payments.orderId, input.orderId));
+
+          const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+
+          if (totalPaid >= order[0].totalAmount) {
+            await database
+              .update(orders)
+              .set({ status: "paid" })
+              .where(eq(orders.id, input.orderId));
+          }
+        }
+
+        return { success: true };
+      }),
+
+    getPayments: protectedProcedure
+      .input(z.object({ orderId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getPaymentsByOrder(input.orderId);
+      }),
+  }),
+
+  // 结算管理
+  settlements: router({
+    list: protectedProcedure
+      .input(z.object({ periodId: z.number().optional() }))
+      .query(async ({ input }) => {
+        return await db.getAllSettlements(input.periodId);
+      }),
+
+    getByDealerAndPeriod: protectedProcedure
+      .input(
+        z.object({
+          dealerId: z.number(),
+          periodId: z.number(),
+        })
+      )
+      .query(async ({ input }) => {
+        return await db.getSettlementByDealerAndPeriod(
+          input.dealerId,
+          input.periodId
+        );
+      }),
+
+    generate: protectedProcedure
+      .input(
+        z.object({
+          dealerId: z.number(),
+          periodId: z.number(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const settlementId = await generateAnnualSettlement(
+          input.dealerId,
+          input.periodId
+        );
+        return { success: true, settlementId };
+      }),
+
+    updateStatus: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          status: z.enum(["draft", "pending_approval", "approved", "paid"]),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        // 检查是否超过18%红线
+        const settlement = await database
+          .select()
+          .from(annualSettlements)
+          .where(eq(annualSettlements.id, input.id))
+          .limit(1);
+
+        if (settlement.length === 0) {
+          throw new Error("结算单不存在");
+        }
+
+        // 如果要审批通过,检查是否超限
+        if (input.status === "approved" && settlement[0].benefitRatio > 1800) {
+          throw new Error("综合让利超过18%红线,无法审批通过");
+        }
+
+        await database
+          .update(annualSettlements)
+          .set({ status: input.status })
+          .where(eq(annualSettlements.id, input.id));
+
+        return { success: true };
+      }),
+
+    getByStatus: protectedProcedure
+      .input(
+        z.object({
+          status: z.enum(["draft", "pending_approval", "approved", "paid"]),
+        })
+      )
+      .query(async ({ input }) => {
+        return await db.getSettlementsByStatus(input.status);
+      }),
+
+    // 获取结算单详细信息(包含下级佣金明细)
+    getDetails: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        const settlement = await database
+          .select()
+          .from(annualSettlements)
+          .where(eq(annualSettlements.id, input.id))
+          .limit(1);
+
+        if (settlement.length === 0) {
+          return null;
+        }
+
+        // 获取下级佣金明细
+        const commissions = await database
+          .select()
+          .from(subCommissions)
+          .where(
+            and(
+              eq(subCommissions.coreDealerId, settlement[0].dealerId),
+              eq(subCommissions.periodId, settlement[0].periodId)
+            )
+          );
+
+        // 获取市场基金流水
+        const funds = await database
+          .select()
+          .from(marketFunds)
+          .where(
+            and(
+              eq(marketFunds.dealerId, settlement[0].dealerId),
+              eq(marketFunds.periodId, settlement[0].periodId)
+            )
+          )
+          .orderBy(desc(marketFunds.recordDate));
+
+        return {
+          settlement: settlement[0],
+          commissions,
+          funds,
+        };
+      }),
+  }),
+
+  // 市场基金管理
+  marketFunds: router({
+    addUsage: protectedProcedure
+      .input(
+        z.object({
+          dealerId: z.number(),
+          periodId: z.number(),
+          amount: z.number(), // 正数,表示使用金额
+          description: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        await database.insert(marketFunds).values({
+          dealerId: input.dealerId,
+          periodId: input.periodId,
+          type: "usage",
+          amount: -Math.abs(input.amount), // 存储为负数
+          description: input.description,
+          recordDate: new Date(),
+        });
+
+        return { success: true };
+      }),
+
+    getByDealer: protectedProcedure
+      .input(
+        z.object({
+          dealerId: z.number(),
+          periodId: z.number(),
+        })
+      )
+      .query(async ({ input }) => {
+        const database = await getDb();
+        if (!database) return [];
+
+        return await database
+          .select()
+          .from(marketFunds)
+          .where(
+            and(
+              eq(marketFunds.dealerId, input.dealerId),
+              eq(marketFunds.periodId, input.periodId)
+            )
+          )
+          .orderBy(desc(marketFunds.recordDate));
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
