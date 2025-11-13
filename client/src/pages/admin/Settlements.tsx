@@ -27,7 +27,7 @@ export default function Settlements() {
 
   const { data: periods } = trpc.periods.list.useQuery();
   const { data: settlements, refetch } = trpc.settlements.list.useQuery(
-    { periodId: selectedPeriodId },
+    { periodId: selectedPeriodId || undefined },
     { enabled: true }
   );
   const { data: dealers } = trpc.dealers.list.useQuery();

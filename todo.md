@@ -102,3 +102,10 @@
 - [x] 修复API返回undefined问题
 - [x] 测试API正常返回
 - [x] 保存检查点
+
+## 修复settlements页面API错误
+- [x] 检查settlements API定义
+- [x] 检查服务器端错误日志
+- [x] 修复API返回HTML的问题
+- [x] 测试settlements页面正常加载
+- [x] 保存检查点
