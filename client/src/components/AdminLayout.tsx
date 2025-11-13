@@ -79,8 +79,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           const isActive = location === item.path;
           return (
             <Link key={item.path} href={item.path}>
-              <a
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors cursor-pointer ${
                   isActive
                     ? "bg-primary text-primary-foreground"
                     : "hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -89,7 +89,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 {item.icon}
                 <span>{item.label}</span>
-              </a>
+              </div>
             </Link>
           );
         })}
