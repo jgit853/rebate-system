@@ -186,11 +186,11 @@ export async function getAllPeriods(): Promise<SettlementPeriod[]> {
   return await db.select().from(settlementPeriods).orderBy(desc(settlementPeriods.startDate));
 }
 
-export async function getActivePeriod(): Promise<SettlementPeriod | undefined> {
+export async function getActivePeriod(): Promise<SettlementPeriod | null> {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) return null;
   const result = await db.select().from(settlementPeriods).where(eq(settlementPeriods.isActive, true)).limit(1);
-  return result[0];
+  return result[0] || null;
 }
 
 export async function getPeriodById(id: number): Promise<SettlementPeriod | undefined> {

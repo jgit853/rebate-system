@@ -96,3 +96,9 @@
 - [x] 在App.tsx中注册路由
 - [x] 测试周期管理功能
 - [x] 保存检查点
+
+## 修复periods.getActive API错误
+- [x] 检查getActivePeriod数据库查询函数
+- [x] 修复API返回undefined问题
+- [x] 测试API正常返回
+- [x] 保存检查点
