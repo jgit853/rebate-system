@@ -13,6 +13,7 @@ import DealerLogin from "./pages/dealer/Login";
 import DealerDashboard from "./pages/dealer/Dashboard";
 import SetPassword from "./pages/dealer/SetPassword";
 import ChangePassword from "./pages/dealer/ChangePassword";
+import Products from "./pages/admin/Products";
 
 function Router() {
   return (
@@ -21,6 +22,7 @@ function Router() {
       <Route path={"/admin"} component={Dashboard} />
       <Route path={"/admin/dealers"} component={Dealers} />
       <Route path={"/admin/dealers/:id"} component={DealerDetail} />
+      <Route path={"/admin/products"} component={Products} />
       <Route path={"/admin/settlements"} component={Settlements} />
       <Route path={"/dealer/login"} component={DealerLogin} />
       <Route path={"/dealer/dashboard"} component={DealerDashboard} />
