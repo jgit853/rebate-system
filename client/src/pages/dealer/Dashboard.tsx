@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { formatMoney, formatBaseUnit, formatRate, formatDate } from "@/lib/format";
 import { LogOut, DollarSign, Calendar, AlertTriangle, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { toast } from "sonner";
 
 interface DealerInfo {
@@ -86,6 +86,11 @@ export default function DealerDashboard() {
               <Settings className="w-4 h-4 mr-2" />
               修改密码
             </Button>
+            <Link href="/dealer/statement">
+              <Button variant="default" size="sm">
+                查看对账单
+              </Button>
+            </Link>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
               退出
