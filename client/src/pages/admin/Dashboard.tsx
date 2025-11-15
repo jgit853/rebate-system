@@ -14,7 +14,6 @@ export default function Dashboard() {
   );
 
   const coreDealers = dealers?.filter((d) => d.type === "core") || [];
-  const overLimitCount = settlements?.filter((s) => s.benefitRatio > 1800).length || 0;
 
   const stats = [
     {
@@ -35,12 +34,6 @@ export default function Dashboard() {
       icon: <FileText className="w-8 h-8 text-purple-500" />,
       description: activePeriod?.name || "暂无活跃周期",
     },
-    {
-      title: "超限预警",
-      value: overLimitCount,
-      icon: <AlertTriangle className="w-8 h-8 text-red-500" />,
-      description: "超过18%红线",
-    },
   ];
 
   const topSettlements = settlements
@@ -56,7 +49,7 @@ export default function Dashboard() {
         </div>
 
         {/* 统计卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {stats.map((stat, index) => (
             <Card key={index}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -77,16 +70,15 @@ export default function Dashboard() {
         {topSettlements && topSettlements.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>综合让利排行 TOP 5</CardTitle>
+              <CardTitle>经销商让利排行 TOP 5</CardTitle>
               <CardDescription>
-                当前周期让利比例最高的经销商(红线:18%)
+                当前周期让利比例最高的经销商
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {topSettlements.map((settlement, index) => {
                   const dealer = dealers?.find((d) => d.id === settlement.dealerId);
-                  const isOverLimit = settlement.benefitRatio > 1800;
 
                   return (
                     <div
@@ -115,19 +107,9 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p
-                          className={`text-lg font-bold ${
-                            isOverLimit ? "text-red-500" : "text-green-600"
-                          }`}
-                        >
+                        <p className="text-lg font-bold text-green-600">
                           {formatRate(settlement.benefitRatio)}
                         </p>
-                        {isOverLimit && (
-                          <p className="text-xs text-red-500 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" />
-                            超限
-                          </p>
-                        )}
                       </div>
                     </div>
                   );

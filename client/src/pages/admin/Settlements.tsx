@@ -65,7 +65,6 @@ export default function Settlements() {
     paid: "bg-blue-100 text-blue-800",
   };
 
-  const overLimitCount = settlements?.filter((s) => s.benefitRatio > 1800).length || 0;
   const totalBenefit = settlements?.reduce((sum, s) => sum + s.totalBenefitAmount, 0) || 0;
 
   return (
@@ -77,7 +76,7 @@ export default function Settlements() {
         </div>
 
         {/* 统计卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -99,18 +98,6 @@ export default function Settlements() {
               <div className="text-3xl font-bold text-green-600">
                 ¥{formatMoney(totalBenefit)}
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                超限预警
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-red-500">{overLimitCount}</div>
-              <p className="text-xs text-muted-foreground mt-1">超过18%红线</p>
             </CardContent>
           </Card>
         </div>
@@ -160,7 +147,6 @@ export default function Settlements() {
                   {settlements && settlements.length > 0 ? (
                     settlements.map((settlement) => {
                       const dealer = dealers?.find((d) => d.id === settlement.dealerId);
-                      const isOverLimit = settlement.benefitRatio > 1800;
 
                       return (
                         <TableRow key={settlement.id}>
@@ -175,15 +161,8 @@ export default function Settlements() {
                             ¥{formatMoney(settlement.totalBenefitAmount)}
                           </TableCell>
                           <TableCell>
-                            <span
-                              className={`font-bold ${
-                                isOverLimit ? "text-red-500" : "text-purple-600"
-                              }`}
-                            >
+                            <span className="text-sm font-medium text-green-600">
                               {formatRate(settlement.benefitRatio)}
-                              {isOverLimit && (
-                                <AlertTriangle className="inline w-4 h-4 ml-1" />
-                              )}
                             </span>
                           </TableCell>
                           <TableCell>

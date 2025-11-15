@@ -60,7 +60,7 @@ export default function DealerDetail() {
     terminal: "终端客户",
   };
 
-  const isOverLimit = settlement && settlement.benefitRatio > 1800;
+  // 综合让利比例仅供管理员内部参考,不对经销商展示
 
   return (
     <AdminLayout>
@@ -137,15 +137,11 @@ export default function DealerDetail() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div
-                  className={`text-2xl font-bold ${
-                    isOverLimit ? "text-red-500" : "text-purple-600"
-                  }`}
-                >
+                <div className="text-2xl font-bold text-purple-600">
                   {formatRate(settlement.benefitRatio)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {isOverLimit ? "⚠️ 超过18%红线" : "✓ 未超限"}
+                  综合让利比例
                 </p>
               </CardContent>
             </Card>
@@ -356,11 +352,7 @@ export default function DealerDetail() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">综合让利比例:</span>
-                      <span
-                        className={`font-bold text-lg ${
-                          isOverLimit ? "text-red-500" : "text-purple-600"
-                        }`}
-                      >
+                      <span className="font-bold text-lg text-purple-600">
                         {formatRate(settlement.benefitRatio)}
                       </span>
                     </div>
