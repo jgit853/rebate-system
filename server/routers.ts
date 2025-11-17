@@ -19,6 +19,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { generateAnnualSettlement } from "./settlement";
 import * as db from "./db";
 import { hashPassword, verifyPassword, generateDealerToken, verifyDealerToken } from "./auth";
+import { filterSettlementData, filterSettlementList, isAdmin } from "./dataFilter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -191,14 +192,18 @@ export const appRouter = router({
 
   // 经销商管理
   dealers: router({
-    list: protectedProcedure.query(async () => {
-      return await db.getAllDealers();
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const dealers = await db.getAllDealers();
+      // 经销商基本信息对所有用户可见,不需过滤
+      return dealers;
     }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getDealerById(input.id);
+      .query(async ({ input, ctx }) => {
+        const dealer = await db.getDealerById(input.id);
+        // 经销商详情对所有用户可见
+        return dealer;
       }),
 
     getByType: protectedProcedure
@@ -523,8 +528,10 @@ export const appRouter = router({
   settlements: router({
     list: protectedProcedure
       .input(z.object({ periodId: z.number().optional() }))
-      .query(async ({ input }) => {
-        return await db.getAllSettlements(input.periodId);
+      .query(async ({ input, ctx }) => {
+        const settlements = await db.getAllSettlements(input.periodId);
+        // 仅管理员可见敏感字段
+        return isAdmin(ctx.user) ? settlements : filterSettlementList(settlements, ctx.user);
       }),
 
     getByDealerAndPeriod: protectedProcedure
@@ -534,11 +541,13 @@ export const appRouter = router({
           periodId: z.number(),
         })
       )
-      .query(async ({ input }) => {
-        return await db.getSettlementByDealerAndPeriod(
+      .query(async ({ input, ctx }) => {
+        const settlement = await db.getSettlementByDealerAndPeriod(
           input.dealerId,
           input.periodId
         );
+        // 根据用户角色过滤敏感字段
+        return settlement ? filterSettlementData(settlement, ctx.user) : null;
       }),
 
     generate: protectedProcedure
