@@ -20,6 +20,7 @@ import { generateAnnualSettlement } from "./settlement";
 import * as db from "./db";
 import { hashPassword, verifyPassword, generateDealerToken, verifyDealerToken } from "./auth";
 import { filterSettlementData, filterSettlementList, isAdmin } from "./dataFilter";
+import { generatePurchasePlans, findOptimalPlan } from "./purchaseCalculator";
 
 export const appRouter = router({
   system: systemRouter,
@@ -706,6 +707,47 @@ export const appRouter = router({
             )
           )
           .orderBy(desc(marketFunds.recordDate));
+      }),
+  }),
+
+  // 进货核算推演工具
+  purchaseCalculator: router({    
+    // 生成多个进货方案对比
+    generatePlans: publicProcedure
+      .input(
+        z.object({
+          currentPayment: z.number(), // 当前已回款金额(分)
+          additionalAmounts: z.array(z.number()), // 追加进货金额列表(分)
+          hasSubDealers: z.boolean().optional(),
+          subTotalPayment: z.number().optional(),
+        })
+      )
+      .query(({ input }) => {
+        return generatePurchasePlans(
+          input.currentPayment,
+          input.additionalAmounts,
+          input.hasSubDealers || false,
+          input.subTotalPayment || 0
+        );
+      }),
+
+    // 找到最优进货方案
+    findOptimal: publicProcedure
+      .input(
+        z.object({
+          currentPayment: z.number(),
+          maxBudget: z.number(), // 最大追加预算(分)
+          hasSubDealers: z.boolean().optional(),
+          subTotalPayment: z.number().optional(),
+        })
+      )
+      .query(({ input }) => {
+        return findOptimalPlan(
+          input.currentPayment,
+          input.maxBudget,
+          input.hasSubDealers || false,
+          input.subTotalPayment || 0
+        );
       }),
   }),
 });

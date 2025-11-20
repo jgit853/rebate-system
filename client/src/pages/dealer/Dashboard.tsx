@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { APP_TITLE } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { formatMoney, formatBaseUnit, formatRate, formatDate } from "@/lib/format";
-import { LogOut, DollarSign, Calendar, AlertTriangle, Settings } from "lucide-react";
+import { LogOut, DollarSign, Calendar, AlertTriangle, Settings, Calculator } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { toast } from "sonner";
@@ -86,8 +86,14 @@ export default function DealerDashboard() {
               <Settings className="w-4 h-4 mr-2" />
               修改密码
             </Button>
-            <Link href="/dealer/statement">
+            <Link href="/dealer/calculator">
               <Button variant="default" size="sm">
+                <Calculator className="w-4 h-4 mr-2" />
+                进货核算
+              </Button>
+            </Link>
+            <Link href="/dealer/statement">
+              <Button variant="outline" size="sm">
                 查看对账单
               </Button>
             </Link>
