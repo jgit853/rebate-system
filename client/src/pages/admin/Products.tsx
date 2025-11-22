@@ -21,16 +21,19 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
 import { formatMoney, formatBaseUnit } from "@/lib/format";
-import { Package, Plus, Search } from "lucide-react";
+import { Package, Plus, Search, Edit, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function Products() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
 
   const { data: products, refetch } = trpc.products.list.useQuery();
   const createMutation = trpc.products.create.useMutation();
+  const updateMutation = trpc.products.update.useMutation();
+  const deleteMutation = trpc.products.delete.useMutation();
 
   const [formData, setFormData] = useState({
     sku: "",
@@ -48,22 +51,58 @@ export default function Products() {
     return matchesSearch;
   });
 
-  const handleCreate = async () => {
+  const handleOpenDialog = (product?: any) => {
+    if (product) {
+      setEditingProduct(product);
+      setFormData({
+        sku: product.sku,
+        name: product.name,
+        spec: product.spec,
+        baseUnit: product.baseUnit.toString(),
+        wholesalePrice: product.wholesalePrice.toString(),
+      });
+    } else {
+      setEditingProduct(null);
+      setFormData({
+        sku: "",
+        name: "",
+        spec: "",
+        baseUnit: "",
+        wholesalePrice: "",
+      });
+    }
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
     if (!formData.sku || !formData.name || !formData.spec || !formData.baseUnit || !formData.wholesalePrice) {
       toast.error("请填写所有必填字段");
       return;
     }
 
     try {
-      await createMutation.mutateAsync({
-        sku: formData.sku,
-        name: formData.name,
-        spec: formData.spec,
-        baseUnit: parseInt(formData.baseUnit),
-        wholesalePrice: parseInt(formData.wholesalePrice),
-      });
-      toast.success("产品创建成功");
+      if (editingProduct) {
+        await updateMutation.mutateAsync({
+          id: editingProduct.id,
+          sku: formData.sku,
+          name: formData.name,
+          spec: formData.spec,
+          baseUnit: parseInt(formData.baseUnit),
+          wholesalePrice: parseInt(formData.wholesalePrice),
+        });
+        toast.success("产品更新成功");
+      } else {
+        await createMutation.mutateAsync({
+          sku: formData.sku,
+          name: formData.name,
+          spec: formData.spec,
+          baseUnit: parseInt(formData.baseUnit),
+          wholesalePrice: parseInt(formData.wholesalePrice),
+        });
+        toast.success("产品创建成功");
+      }
       setDialogOpen(false);
+      setEditingProduct(null);
       setFormData({
         sku: "",
         name: "",
@@ -73,7 +112,21 @@ export default function Products() {
       });
       refetch();
     } catch (error) {
-      toast.error("创建失败: " + (error as Error).message);
+      toast.error("操作失败: " + (error as Error).message);
+    }
+  };
+
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`确定要删除产品「${name}」吗?此操作不可恢复。`)) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync({ id });
+      toast.success("产品已删除");
+      refetch();
+    } catch (error) {
+      toast.error("删除失败: " + (error as Error).message);
     }
   };
 
@@ -85,7 +138,7 @@ export default function Products() {
             <h1 className="text-3xl font-bold">产品管理</h1>
             <p className="text-muted-foreground mt-1">管理系统中的所有产品信息</p>
           </div>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={() => handleOpenDialog()}>
             <Plus className="w-4 h-4 mr-2" />
             新建产品
           </Button>
@@ -164,6 +217,7 @@ export default function Products() {
                   <TableHead>规格</TableHead>
                   <TableHead>基数单位</TableHead>
                   <TableHead>批发价</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -175,11 +229,30 @@ export default function Products() {
                         <TableCell>{product.spec}</TableCell>
                         <TableCell>{formatBaseUnit(product.baseUnit)}</TableCell>
                         <TableCell>¥{formatMoney(product.wholesalePrice)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenDialog(product)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(product.id, product.name)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
                         {searchTerm ? "未找到匹配的产品" : "暂无产品"}
                       </TableCell>
                     </TableRow>
@@ -194,8 +267,10 @@ export default function Products() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>新建产品</DialogTitle>
-              <DialogDescription>添加新的产品信息到系统</DialogDescription>
+              <DialogTitle>{editingProduct ? "编辑产品" : "新建产品"}</DialogTitle>
+              <DialogDescription>
+                {editingProduct ? "修改产品信息" : "添加新的产品信息到系统"}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -256,8 +331,8 @@ export default function Products() {
               <Button variant="outline" onClick={() => setDialogOpen(false)}>
                 取消
               </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending}>
-                {createMutation.isPending ? "创建中..." : "创建"}
+              <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending}>
+                {(createMutation.isPending || updateMutation.isPending) ? "处理中..." : (editingProduct ? "更新" : "创建")}
               </Button>
             </DialogFooter>
           </DialogContent>

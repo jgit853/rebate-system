@@ -249,7 +249,11 @@ export const appRouter = router({
       .input(
         z.object({
           id: z.number(),
+          code: z.string().optional(),
           name: z.string().optional(),
+          type: z.enum(["core", "sub_dealer", "terminal"]).optional(),
+          parentDealerId: z.number().optional().nullable(),
+          username: z.string().optional(),
           status: z.enum(["active", "inactive"]).optional(),
         })
       )
@@ -258,13 +262,28 @@ export const appRouter = router({
         if (!database) throw new Error("数据库连接失败");
 
         const updateData: any = {};
-        if (input.name) updateData.name = input.name;
-        if (input.status) updateData.status = input.status;
+        if (input.code !== undefined) updateData.code = input.code;
+        if (input.name !== undefined) updateData.name = input.name;
+        if (input.type !== undefined) updateData.type = input.type;
+        if (input.parentDealerId !== undefined) updateData.parentDealerId = input.parentDealerId;
+        if (input.username !== undefined) updateData.username = input.username;
+        if (input.status !== undefined) updateData.status = input.status;
 
         await database
           .update(dealers)
           .set(updateData)
           .where(eq(dealers.id, input.id));
+
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        await database.delete(dealers).where(eq(dealers.id, input.id));
 
         return { success: true };
       }),
@@ -311,8 +330,11 @@ export const appRouter = router({
       .input(
         z.object({
           id: z.number(),
+          sku: z.string().optional(),
           name: z.string().optional(),
+          spec: z.string().optional(),
           wholesalePrice: z.number().optional(),
+          baseUnit: z.number().optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -320,13 +342,27 @@ export const appRouter = router({
         if (!database) throw new Error("数据库连接失败");
 
         const updateData: any = {};
-        if (input.name) updateData.name = input.name;
-        if (input.wholesalePrice) updateData.wholesalePrice = input.wholesalePrice;
+        if (input.sku !== undefined) updateData.sku = input.sku;
+        if (input.name !== undefined) updateData.name = input.name;
+        if (input.spec !== undefined) updateData.spec = input.spec;
+        if (input.wholesalePrice !== undefined) updateData.wholesalePrice = input.wholesalePrice;
+        if (input.baseUnit !== undefined) updateData.baseUnit = input.baseUnit;
 
         await database
           .update(products)
           .set(updateData)
           .where(eq(products.id, input.id));
+
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        await database.delete(products).where(eq(products.id, input.id));
 
         return { success: true };
       }),

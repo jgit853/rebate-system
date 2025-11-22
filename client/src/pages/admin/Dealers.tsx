@@ -28,7 +28,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Edit, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -38,9 +38,12 @@ export default function Dealers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingDealer, setEditingDealer] = useState<any>(null);
 
   const { data: dealers, refetch } = trpc.dealers.list.useQuery();
   const createMutation = trpc.dealers.create.useMutation();
+  const updateMutation = trpc.dealers.update.useMutation();
+  const deleteMutation = trpc.dealers.delete.useMutation();
 
   const [formData, setFormData] = useState({
     code: "",
@@ -58,11 +61,43 @@ export default function Dealers() {
     return matchesSearch && matchesType;
   });
 
-  const handleCreate = async () => {
+  const handleOpenDialog = (dealer?: any) => {
+    if (dealer) {
+      setEditingDealer(dealer);
+      setFormData({
+        code: dealer.code,
+        name: dealer.name,
+        type: dealer.type,
+        parentDealerId: dealer.parentDealerId,
+        username: dealer.username || "",
+      });
+    } else {
+      setEditingDealer(null);
+      setFormData({
+        code: "",
+        name: "",
+        type: "core",
+        parentDealerId: undefined,
+        username: "",
+      });
+    }
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
     try {
-      await createMutation.mutateAsync(formData);
-      toast.success("经销商创建成功");
+      if (editingDealer) {
+        await updateMutation.mutateAsync({
+          id: editingDealer.id,
+          ...formData,
+        });
+        toast.success("经销商更新成功");
+      } else {
+        await createMutation.mutateAsync(formData);
+        toast.success("经销商创建成功");
+      }
       setDialogOpen(false);
+      setEditingDealer(null);
       setFormData({
         code: "",
         name: "",
@@ -72,7 +107,21 @@ export default function Dealers() {
       });
       refetch();
     } catch (error) {
-      toast.error("创建失败: " + (error as Error).message);
+      toast.error("操作失败: " + (error as Error).message);
+    }
+  };
+
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`确定要删除经销商「${name}」吗?此操作不可恢复。`)) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync({ id });
+      toast.success("经销商已删除");
+      refetch();
+    } catch (error) {
+      toast.error("删除失败: " + (error as Error).message);
     }
   };
 
@@ -97,15 +146,17 @@ export default function Dealers() {
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={() => handleOpenDialog()}>
                 <Plus className="w-4 h-4 mr-2" />
                 新增经销商
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>新增经销商</DialogTitle>
-                <DialogDescription>填写经销商基本信息</DialogDescription>
+                <DialogTitle>{editingDealer ? "编辑经销商" : "新增经销商"}</DialogTitle>
+                <DialogDescription>
+                  {editingDealer ? "修改经销商信息" : "填写经销商基本信息"}
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -167,8 +218,8 @@ export default function Dealers() {
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
                   取消
                 </Button>
-                <Button onClick={handleCreate} disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "创建中..." : "确认创建"}
+                <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending}>
+                  {(createMutation.isPending || updateMutation.isPending) ? "处理中..." : (editingDealer ? "确认更新" : "确认创建")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -240,11 +291,28 @@ export default function Dealers() {
                         </TableCell>
                         <TableCell>{formatDate(dealer.createdAt)}</TableCell>
                         <TableCell>
-                          <Link href={`/admin/dealers/${dealer.id}`}>
-                            <Button variant="ghost" size="sm">
-                              查看详情
+                          <div className="flex gap-2">
+                            <Link href={`/admin/dealers/${dealer.id}`}>
+                              <Button variant="ghost" size="sm">
+                                查看详情
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenDialog(dealer)}
+                            >
+                              <Edit className="w-4 h-4" />
                             </Button>
-                          </Link>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(dealer.id, dealer.name)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
