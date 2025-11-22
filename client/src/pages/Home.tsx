@@ -58,14 +58,14 @@ export default function Home() {
             </Button>
             <div className="flex justify-between text-center">
               <Link href="/dealer/login">
-                <a className="text-sm text-muted-foreground hover:text-foreground">
+                <div className="text-sm text-muted-foreground hover:text-foreground cursor-pointer">
                   经销商登录 →
-                </a>
+                </div>
               </Link>
               <Link href="/admin">
-                <a className="text-sm text-muted-foreground hover:text-foreground">
+                <div className="text-sm text-muted-foreground hover:text-foreground cursor-pointer">
                   管理员入口 →
-                </a>
+                </div>
               </Link>
             </div>
           </CardContent>
