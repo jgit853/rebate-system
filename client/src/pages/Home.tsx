@@ -5,11 +5,20 @@ import { APP_LOGO, APP_TITLE, getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { formatMoney, formatBaseUnit, formatRate, formatDate } from "@/lib/format";
 import { LogOut, TrendingUp, DollarSign, Calendar, AlertTriangle } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useEffect } from "react";
 
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth();
   const logoutMutation = trpc.auth.logout.useMutation();
+  const [, setLocation] = useLocation();
+
+  // 管理员自动跳转到管理后台
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'admin') {
+      setLocation('/admin');
+    }
+  }, [isAuthenticated, user?.role, setLocation]);
 
   const { data: dealers } = trpc.dealers.list.useQuery(undefined, { enabled: isAuthenticated });
   const { data: activePeriod } = trpc.periods.getActive.useQuery(undefined, { enabled: isAuthenticated });
