@@ -18,6 +18,7 @@ import PurchaseCalculator from "./pages/dealer/PurchaseCalculator";
 import Products from "./pages/admin/Products";
 import Orders from "./pages/admin/Orders";
 import Periods from "./pages/admin/Periods";
+import PolicySettings from "./pages/admin/PolicySettings";
 
 function Router() {
   return (
@@ -29,6 +30,7 @@ function Router() {
       <Route path={"/admin/products"} component={Products} />
       <Route path={"/admin/orders"} component={Orders} />
       <Route path={"/admin/periods"} component={Periods} />
+      <Route path={"/admin/policy-settings"} component={PolicySettings} />
       <Route path={"/admin/settlements"} component={Settlements} />
       <Route path={"/dealer/login"} component={DealerLogin} />
       <Route path={"/dealer/dashboard"} component={DealerDashboard} />

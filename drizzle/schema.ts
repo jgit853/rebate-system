@@ -218,3 +218,27 @@ export const marketFunds = mysqlTable("market_funds", {
 
 export type MarketFund = typeof marketFunds.$inferSelect;
 export type InsertMarketFund = typeof marketFunds.$inferInsert;
+
+/**
+ * 政策参数设置表 - 存储系统的各项返利政策参数
+ */
+export const policySettings = mysqlTable("policy_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  // 返利阶梯参数 - 存储为JSON字符串,格式: [{threshold: 1000, rate: 900}, ...]
+  rebateTiers: text("rebateTiers").notNull(),
+  // 超期扣减参数 - 存储为JSON字符串,格式: [{overdueRatio: 500, deduction: 100}, ...]
+  overdueDeductions: text("overdueDeductions").notNull(),
+  // 综合让利红线 - 以万分之一为单位,如18%存为1800
+  benefitRedline: int("benefitRedline").notNull(),
+  // 市场基金比例 - 以万分之一为单位
+  marketFundRate: int("marketFundRate").notNull(),
+  // 首年抽佣比例 - 以万分之一为单位
+  firstYearCommissionRate: int("firstYearCommissionRate").notNull(),
+  // 续约抽佣比例 - 以万分之一为单位
+  renewalCommissionRate: int("renewalCommissionRate").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedBy: int("updatedBy"), // 更新人的userId
+});
+
+export type PolicySetting = typeof policySettings.$inferSelect;
+export type InsertPolicySetting = typeof policySettings.$inferInsert;

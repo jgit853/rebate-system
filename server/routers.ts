@@ -786,6 +786,73 @@ export const appRouter = router({
         );
       }),
   }),
+
+  // 政策参数设置
+  policySettings: router({
+    // 获取当前政策参数
+    get: protectedProcedure.query(async () => {
+      const settings = await db.getPolicySettings();
+      
+      if (!settings) {
+        // 返回默认值
+        return {
+          id: 0,
+          rebateTiers: JSON.stringify([
+            { threshold: 0, rate: 600 },
+            { threshold: 100000, rate: 700 },
+            { threshold: 200000, rate: 800 },
+            { threshold: 300000, rate: 900 },
+          ]),
+          overdueDeductions: JSON.stringify([
+            { overdueRatio: 0, deduction: 0 },
+            { overdueRatio: 500, deduction: 100 },
+            { overdueRatio: 1000, deduction: 200 },
+          ]),
+          benefitRedline: 1800,
+          marketFundRate: 300,
+          firstYearCommissionRate: 1500,
+          renewalCommissionRate: 500,
+          updatedAt: new Date(),
+          updatedBy: null,
+        };
+      }
+      
+      return settings;
+    }),
+
+    // 更新政策参数(仅管理员)
+    update: protectedProcedure
+      .input(
+        z.object({
+          rebateTiers: z.string(),
+          overdueDeductions: z.string(),
+          benefitRedline: z.number(),
+          marketFundRate: z.number(),
+          firstYearCommissionRate: z.number(),
+          renewalCommissionRate: z.number(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new Error('仅管理员可以修改政策参数');
+        }
+
+        // 验证JSON格式
+        try {
+          JSON.parse(input.rebateTiers);
+          JSON.parse(input.overdueDeductions);
+        } catch (e) {
+          throw new Error('返利阶梯或超期扣减参数格式错误');
+        }
+
+        await db.updatePolicySettings({
+          ...input,
+          updatedBy: ctx.user.id,
+        });
+
+        return { success: true };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

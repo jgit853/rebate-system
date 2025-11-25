@@ -12,12 +12,15 @@ import {
   annualSettlements,
   subCommissions,
   marketFunds,
+  policySettings,
   type Dealer,
   type Product,
   type Order,
   type Payment,
   type SettlementPeriod,
   type AnnualSettlement,
+  type PolicySetting,
+  type InsertPolicySetting,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -246,4 +249,66 @@ export async function getSettlementsByStatus(
     .from(annualSettlements)
     .where(eq(annualSettlements.status, status))
     .orderBy(desc(annualSettlements.createdAt));
+}
+
+// ==================== 政策参数相关 ====================
+
+/**
+ * 获取当前政策参数设置
+ */
+export async function getPolicySettings(): Promise<PolicySetting | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const results = await db.select().from(policySettings).limit(1);
+  return results[0];
+}
+
+/**
+ * 更新政策参数设置
+ */
+export async function updatePolicySettings(settings: Partial<InsertPolicySetting> & { updatedBy: number }): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const existing = await getPolicySettings();
+  
+  if (existing) {
+    await db.update(policySettings)
+      .set({
+        ...settings,
+        updatedAt: new Date(),
+      })
+      .where(eq(policySettings.id, existing.id));
+  } else {
+    // 如果不存在,创建默认配置
+    await db.insert(policySettings).values({
+      rebateTiers: settings.rebateTiers || JSON.stringify([
+        { threshold: 0, rate: 600 },
+        { threshold: 100000, rate: 700 },
+        { threshold: 200000, rate: 800 },
+        { threshold: 300000, rate: 900 },
+      ]),
+      overdueDeductions: settings.overdueDeductions || JSON.stringify([
+        { overdueRatio: 0, deduction: 0 },
+        { overdueRatio: 500, deduction: 100 },
+        { overdueRatio: 1000, deduction: 200 },
+      ]),
+      benefitRedline: settings.benefitRedline || 1800,
+      marketFundRate: settings.marketFundRate || 300,
+      firstYearCommissionRate: settings.firstYearCommissionRate || 1500,
+      renewalCommissionRate: settings.renewalCommissionRate || 500,
+      updatedBy: settings.updatedBy,
+    });
+  }
+}
+
+/**
+ * 初始化默认政策参数(如果不存在)
+ */
+export async function initDefaultPolicySettings(): Promise<void> {
+  const existing = await getPolicySettings();
+  if (!existing) {
+    await updatePolicySettings({ updatedBy: 0 });
+  }
 }
