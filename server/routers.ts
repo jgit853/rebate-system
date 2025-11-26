@@ -191,6 +191,31 @@ export const appRouter = router({
       }),
   }),
 
+  // 经销商专用API（不需要OAuth认证）
+  dealerApi: router({
+    // 获取当前活跃周期
+    getActivePeriod: publicProcedure.query(async () => {
+      return await db.getActivePeriod();
+    }),
+
+    // 获取经销商的结算数据
+    getMySettlement: publicProcedure
+      .input(
+        z.object({
+          dealerId: z.number(),
+          periodId: z.number(),
+        })
+      )
+      .query(async ({ input }) => {
+        const settlement = await db.getSettlementByDealerAndPeriod(
+          input.dealerId,
+          input.periodId
+        );
+        // 经销商只能看到自己的数据，不过滤敏感字段
+        return settlement;
+      }),
+  }),
+
   // 经销商管理
   dealers: router({
     list: protectedProcedure.query(async ({ ctx }) => {

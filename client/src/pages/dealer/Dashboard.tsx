@@ -33,8 +33,8 @@ export default function DealerDashboard() {
     setDealerInfo(JSON.parse(storedInfo));
   }, [setLocation]);
 
-  const { data: activePeriod } = trpc.periods.getActive.useQuery();
-  const { data: settlement } = trpc.settlements.getByDealerAndPeriod.useQuery(
+  const { data: activePeriod } = trpc.dealerApi.getActivePeriod.useQuery();
+  const { data: settlement } = trpc.dealerApi.getMySettlement.useQuery(
     { dealerId: dealerInfo?.id || 0, periodId: activePeriod?.id || 0 },
     { enabled: !!dealerInfo && !!activePeriod }
   );

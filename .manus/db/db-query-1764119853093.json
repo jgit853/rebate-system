@@ -1,0 +1,26 @@
+{
+  "query": "SELECT * FROM dealers",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 44Yyg6PtKfZEb4u.c4dc50395fc1 --database XkQfKrbqcrFTpbgmm4Qjj3 --execute SELECT * FROM dealers",
+  "rows": [
+    {
+      "id": "1",
+      "code": "7605",
+      "name": "7605",
+      "parentDealerId": "NULL",
+      "type": "core",
+      "status": "active",
+      "firstPaymentDate": "NULL",
+      "userId": "NULL",
+      "createdAt": "2025-11-20 10:08:54",
+      "updatedAt": "2025-11-25 12:35:42",
+      "username": "7605",
+      "passwordHash": "$2b$10$t/NFvprShvrF427b5TcEF.EDiZcIlghQeuyF2daUrBPucrvvqckti",
+      "passwordSetAt": "2025-11-25 12:34:18",
+      "lastLoginAt": "2025-11-25 12:35:42"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tcode\tname\tparentDealerId\ttype\tstatus\tfirstPaymentDate\tuserId\tcreatedAt\tupdatedAt\tusername\tpasswordHash\tpasswordSetAt\tlastLoginAt\n1\t7605\t7605\tNULL\tcore\tactive\tNULL\tNULL\t2025-11-20 10:08:54\t2025-11-25 12:35:42\t7605\t$2b$10$t/NFvprShvrF427b5TcEF.EDiZcIlghQeuyF2daUrBPucrvvqckti\t2025-11-25 12:34:18\t2025-11-25 12:35:42\n",
+  "stderr": "",
+  "execution_time_ms": 1524
+}

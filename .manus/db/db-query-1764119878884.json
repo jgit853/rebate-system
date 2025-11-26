@@ -1,0 +1,18 @@
+{
+  "query": "SELECT id, code, name, type, username, passwordHash FROM dealers LIMIT 1",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 44Yyg6PtKfZEb4u.c4dc50395fc1 --database XkQfKrbqcrFTpbgmm4Qjj3 --execute SELECT id, code, name, type, username, passwordHash FROM dealers LIMIT 1",
+  "rows": [
+    {
+      "id": "1",
+      "code": "7605",
+      "name": "7605",
+      "type": "core",
+      "username": "7605",
+      "passwordHash": "$2b$10$t/NFvprShvrF427b5TcEF.EDiZcIlghQeuyF2daUrBPucrvvqckti"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tcode\tname\ttype\tusername\tpasswordHash\n1\t7605\t7605\tcore\t7605\t$2b$10$t/NFvprShvrF427b5TcEF.EDiZcIlghQeuyF2daUrBPucrvvqckti\n",
+  "stderr": "",
+  "execution_time_ms": 1552
+}
