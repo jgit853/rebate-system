@@ -8,7 +8,8 @@ import {
   Gift,
   Calendar,
   Award,
-  Sparkles
+  Sparkles,
+  AlertTriangle
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -18,23 +19,24 @@ export default function DealerStatement() {
   const [dealerInfo, setDealerInfo] = useState<{ id: number; name: string } | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("dealer_token");
-    if (!token) {
+    const token = localStorage.getItem("dealerToken");
+    const storedInfo = localStorage.getItem("dealerInfo");
+    
+    if (!token || !storedInfo) {
       setLocation("/dealer/login");
       return;
     }
 
     try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      setDealerInfo({ id: payload.dealerId, name: payload.dealerName });
+      setDealerInfo(JSON.parse(storedInfo));
     } catch (error) {
-      console.error("Token解析失败:", error);
+      console.error("经销商信息解析失败:", error);
       setLocation("/dealer/login");
     }
   }, [setLocation]);
 
-  const { data: activePeriod } = trpc.periods.getActive.useQuery();
-  const { data: settlement } = trpc.settlements.getByDealerAndPeriod.useQuery(
+  const { data: activePeriod, isLoading: isPeriodLoading } = trpc.dealerApi.getActivePeriod.useQuery();
+  const { data: settlement } = trpc.dealerApi.getMySettlement.useQuery(
     {
       dealerId: dealerInfo?.id || 0,
       periodId: activePeriod?.id || 0,
@@ -45,12 +47,13 @@ export default function DealerStatement() {
   // 暂时不显示下级佣金,因为API尚未实现
   const subCommissions: any[] = [];
 
-  const { data: marketFunds } = trpc.marketFunds.getByDealer.useQuery(
+  const { data: marketFunds } = trpc.dealerApi.getMyMarketFunds.useQuery(
     { dealerId: dealerInfo?.id || 0, periodId: activePeriod?.id || 0 },
     { enabled: !!dealerInfo && !!activePeriod }
   );
 
-  if (!dealerInfo || !activePeriod) {
+  // 正在加载经销商信息或周期数据
+  if (!dealerInfo || isPeriodLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
@@ -61,6 +64,32 @@ export default function DealerStatement() {
     );
   }
 
+  // 没有活跃周期
+  if (!activePeriod) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+        <div className="container max-w-4xl mx-auto">
+          <Card className="border-2 border-blue-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white">
+              <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                <Calendar className="h-6 w-6" />
+                当前结算周期
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="text-center py-8">
+                <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+                <p className="text-gray-600 text-lg">暂无活跃周期</p>
+                <p className="text-gray-500 mt-2">当前没有进行中的结算周期，请联系管理员创建。</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // 有周期但没有结算数据
   if (!settlement) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">

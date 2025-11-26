@@ -214,6 +214,30 @@ export const appRouter = router({
         // 经销商只能看到自己的数据，不过滤敏感字段
         return settlement;
       }),
+
+    // 获取经销商的市场基金记录
+    getMyMarketFunds: publicProcedure
+      .input(
+        z.object({
+          dealerId: z.number(),
+          periodId: z.number(),
+        })
+      )
+      .query(async ({ input }) => {
+        const database = await getDb();
+        if (!database) return [];
+
+        return await database
+          .select()
+          .from(marketFunds)
+          .where(
+            and(
+              eq(marketFunds.dealerId, input.dealerId),
+              eq(marketFunds.periodId, input.periodId)
+            )
+          )
+          .orderBy(desc(marketFunds.recordDate));
+      }),
   }),
 
   // 经销商管理
