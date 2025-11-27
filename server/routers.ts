@@ -249,6 +249,37 @@ export const appRouter = router({
           )
           .orderBy(desc(marketFunds.recordDate));
       }),
+
+    // 获取政策参数（经销商可见）
+    getPolicySettings: publicProcedure.query(async () => {
+      const settings = await db.getPolicySettings();
+      
+      if (!settings) {
+        // 返回默认值
+        return {
+          id: 0,
+          rebateTiers: JSON.stringify([
+            { threshold: 0, rate: 500 },
+            { threshold: 50000000, rate: 800 },
+            { threshold: 100000000, rate: 1200 },
+            { threshold: 200000000, rate: 1500 },
+          ]),
+          overdueDeductions: JSON.stringify([
+            { overdueRatio: 0, deduction: 0 },
+            { overdueRatio: 500, deduction: 100 },
+            { overdueRatio: 1000, deduction: 200 },
+          ]),
+          benefitRedline: 1800,
+          marketFundRate: 300,
+          firstYearCommissionRate: 1500,
+          renewalCommissionRate: 500,
+          updatedAt: new Date(),
+          updatedBy: null,
+        };
+      }
+      
+      return settings;
+    }),
   }),
 
   // 经销商管理
@@ -818,8 +849,8 @@ export const appRouter = router({
           subTotalPayment: z.number().optional(),
         })
       )
-      .query(({ input }) => {
-        return generatePurchasePlans(
+      .query(async ({ input }) => {
+        return await generatePurchasePlans(
           input.currentPayment,
           input.additionalAmounts,
           input.hasSubDealers || false,
@@ -837,8 +868,8 @@ export const appRouter = router({
           subTotalPayment: z.number().optional(),
         })
       )
-      .query(({ input }) => {
-        return findOptimalPlan(
+      .query(async ({ input }) => {
+        return await findOptimalPlan(
           input.currentPayment,
           input.maxBudget,
           input.hasSubDealers || false,

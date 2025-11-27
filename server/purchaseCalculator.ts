@@ -4,25 +4,60 @@
  */
 
 import { Dealer } from "../drizzle/schema";
+import * as db from "./db";
 
 /**
- * 阶梯返利配置
+ * 阶梯返利配置接口
  */
-const REBATE_TIERS = [
-  { threshold: 0, rate: 0.05 }, // 0-50万: 5%
-  { threshold: 500000_00, rate: 0.08 }, // 50-100万: 8%
-  { threshold: 1000000_00, rate: 0.12 }, // 100-200万: 12%
-  { threshold: 2000000_00, rate: 0.15 }, // 200万以上: 15%
-];
+interface RebateTier {
+  threshold: number;
+  rate: number;
+}
+
+/**
+ * 从数据库获取阶梯返利配置
+ */
+async function getRebateTiers(): Promise<RebateTier[]> {
+  const settings = await db.getPolicySettings();
+  
+  if (!settings) {
+    // 返回默认值
+    return [
+      { threshold: 0, rate: 500 },
+      { threshold: 50000000, rate: 800 },
+      { threshold: 100000000, rate: 1200 },
+      { threshold: 200000000, rate: 1500 },
+    ].map(t => ({ threshold: t.threshold, rate: t.rate / 10000 }));
+  }
+  
+  const tiers = JSON.parse(settings.rebateTiers) as Array<{ threshold: number; rate: number }>;
+  // 将万分之一转换为小数
+  return tiers.map(t => ({ threshold: t.threshold, rate: t.rate / 10000 }));
+}
+
+/**
+ * 从数据库获取市场基金比例
+ */
+async function getMarketFundRate(): Promise<number> {
+  const settings = await db.getPolicySettings();
+  
+  if (!settings) {
+    return 300 / 10000; // 默认3%
+  }
+  
+  return settings.marketFundRate / 10000;
+}
 
 /**
  * 计算指定回款金额对应的阶梯返利
  */
-export function calculateTieredRebate(paymentAmount: number): {
+export async function calculateTieredRebate(paymentAmount: number): Promise<{
   rebateAmount: number;
   effectiveRate: number;
   tier: number;
-} {
+}> {
+  const REBATE_TIERS = await getRebateTiers();
+  
   let rebateAmount = 0;
   let remainingAmount = paymentAmount;
   let currentTier = 0;
@@ -67,8 +102,9 @@ export function calculateSubCommission(
 /**
  * 计算市场基金
  */
-export function calculateMarketFund(paymentAmount: number): number {
-  return Math.floor(paymentAmount * 0.03); // 3%计提
+export async function calculateMarketFund(paymentAmount: number): Promise<number> {
+  const rate = await getMarketFundRate();
+  return Math.floor(paymentAmount * rate);
 }
 
 /**
@@ -94,20 +130,26 @@ export interface PurchasePlan {
  * @param hasSubDealers 是否有下级经销商
  * @param subTotalPayment 下级总回款(分,可选)
  */
-export function generatePurchasePlans(
+export async function generatePurchasePlans(
   currentPayment: number,
   additionalAmounts: number[],
   hasSubDealers: boolean = false,
   subTotalPayment: number = 0
-): PurchasePlan[] {
+): Promise<PurchasePlan[]> {
+  const REBATE_TIERS = await getRebateTiers();
   const plans: PurchasePlan[] = [];
 
-  const tierNames = ["第一档(0-50万)", "第二档(50-100万)", "第三档(100-200万)", "第四档(200万以上)"];
+  // 根据实际配置生成阶梯名称
+  const tierNames = REBATE_TIERS.map((tier, idx, arr) => {
+    const start = (tier.threshold / 100).toFixed(0);
+    const end = arr[idx + 1] ? (arr[idx + 1].threshold / 100).toFixed(0) : "";
+    return end ? `第${idx + 1}档(${start}-${end}万)` : `第${idx + 1}档(${start}万以上)`;
+  });
 
   for (const additional of additionalAmounts) {
     const targetAmount = currentPayment + additional;
-    const rebateResult = calculateTieredRebate(targetAmount);
-    const marketFund = calculateMarketFund(targetAmount);
+    const rebateResult = await calculateTieredRebate(targetAmount);
+    const marketFund = await calculateMarketFund(targetAmount);
 
     // 下级抽佣收益(简化计算,实际应根据具体下级数据)
     let subCommission = 0;
@@ -160,12 +202,12 @@ export function generatePurchasePlans(
  * 找到最优进货方案
  * 在给定预算范围内,找到收益率最高的方案
  */
-export function findOptimalPlan(
+export async function findOptimalPlan(
   currentPayment: number,
   maxBudget: number,
   hasSubDealers: boolean = false,
   subTotalPayment: number = 0
-): PurchasePlan {
+): Promise<PurchasePlan> {
   // 生成候选方案:当前金额 + 10万、20万...直到预算上限
   const candidates: number[] = [];
   for (let add = 100000_00; add <= maxBudget; add += 100000_00) {
@@ -176,7 +218,7 @@ export function findOptimalPlan(
     candidates.push(maxBudget);
   }
 
-  const plans = generatePurchasePlans(currentPayment, candidates, hasSubDealers, subTotalPayment);
+  const plans = await generatePurchasePlans(currentPayment, candidates, hasSubDealers, subTotalPayment);
 
   // 找到综合收益率最高的方案
   let optimalPlan = plans[0];

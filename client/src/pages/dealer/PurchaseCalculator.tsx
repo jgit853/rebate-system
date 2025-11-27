@@ -12,16 +12,21 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/lib/format";
-import { Calculator, TrendingUp, Lightbulb, Target } from "lucide-react";
+import { Calculator, TrendingUp, Lightbulb, Target, ArrowLeft } from "lucide-react";
+import { useLocation } from "wouter";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function PurchaseCalculator() {
+  const [, setLocation] = useLocation();
   const [currentPayment, setCurrentPayment] = useState("");
   const [maxBudget, setMaxBudget] = useState("");
   const [customAmounts, setCustomAmounts] = useState<string[]>(["", "", ""]);
 
   const [showResults, setShowResults] = useState(false);
+
+  // 获取政策参数
+  const { data: policySettings } = trpc.dealerApi.getPolicySettings.useQuery();
 
   // 生成方案对比
   const { data: plans, refetch: refetchPlans } = trpc.purchaseCalculator.generatePlans.useQuery(
@@ -83,6 +88,13 @@ export default function PurchaseCalculator() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* 页头 */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setLocation("/dealer/dashboard")}
+            className="p-2 hover:bg-white/80 rounded-lg transition-colors"
+            title="返回仪表盘"
+          >
+            <ArrowLeft className="w-6 h-6 text-gray-600" />
+          </button>
           <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
             <Calculator className="w-8 h-8 text-white" />
           </div>
@@ -298,20 +310,37 @@ export default function PurchaseCalculator() {
             <CardTitle className="text-blue-900">使用说明</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-blue-800">
-            <p>
-              <strong>1. 阶梯返利规则:</strong> 0-50万(5%), 50-100万(8%), 100-200万(12%),
-              200万以上(15%)
-            </p>
-            <p>
-              <strong>2. 市场基金:</strong> 按回款金额的3%计提,可用于市场推广活动
-            </p>
-            <p>
-              <strong>3. 综合收益率:</strong> (阶梯返利 + 市场基金) / 目标进货金额
-            </p>
-            <p>
-              <strong>4. 建议:</strong>{" "}
-              优先考虑能够升档的进货金额,返利率提升明显,综合收益更高
-            </p>
+            {policySettings ? (
+              <>
+                <p>
+                  <strong>1. 阶梯返利规则:</strong>{" "}
+                  {JSON.parse(policySettings.rebateTiers)
+                    .map((tier: any, idx: number, arr: any[]) => {
+                      const nextThreshold = arr[idx + 1]?.threshold;
+                      const start = (tier.threshold / 100).toFixed(0);
+                      const end = nextThreshold ? (nextThreshold / 100).toFixed(0) : "";
+                      const rate = (tier.rate / 100).toFixed(2);
+                      return end
+                        ? `${start}-${end}万(${rate}%)`
+                        : `${start}万以上(${rate}%)`;
+                    })
+                    .join(", ")}
+                </p>
+                <p>
+                  <strong>2. 市场基金:</strong> 按回款金额的
+                  {(policySettings.marketFundRate / 100).toFixed(2)}%计提,可用于市场推广活动
+                </p>
+                <p>
+                  <strong>3. 综合收益率:</strong> (阶梯返利 + 市场基金) / 目标进货金额
+                </p>
+                <p>
+                  <strong>4. 建议:</strong>{" "}
+                  优先考虑能够升档的进货金额,返利率提升明显,综合收益更高
+                </p>
+              </>
+            ) : (
+              <p>正在加载政策参数...</p>
+            )}
           </CardContent>
         </Card>
       </div>
