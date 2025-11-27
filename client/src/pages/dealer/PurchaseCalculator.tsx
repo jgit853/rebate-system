@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/lib/format";
-import { Calculator, TrendingUp, Lightbulb, Target, ArrowLeft } from "lucide-react";
+import { Calculator, TrendingUp, Lightbulb, Target, ArrowLeft, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ export default function PurchaseCalculator() {
   const [customAmounts, setCustomAmounts] = useState<string[]>(["", "", ""]);
 
   const [showResults, setShowResults] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   // 获取政策参数
   const { data: policySettings } = trpc.dealerApi.getPolicySettings.useQuery();
@@ -61,19 +62,26 @@ export default function PurchaseCalculator() {
       return;
     }
 
+    setIsCalculating(true);
     setShowResults(true);
 
-    // 如果有自定义金额,生成对比方案
-    if (validCustomAmounts.length > 0) {
-      await refetchPlans();
-    }
+    try {
+      // 如果有自定义金额,生成对比方案
+      if (validCustomAmounts.length > 0) {
+        await refetchPlans();
+      }
 
-    // 如果有最大预算,找到最优方案
-    if (maxBudget && parseFloat(maxBudget) > 0) {
-      await refetchOptimal();
-    }
+      // 如果有最大预算,找到最优方案
+      if (maxBudget && parseFloat(maxBudget) > 0) {
+        await refetchOptimal();
+      }
 
-    toast.success("核算完成");
+      toast.success("核算完成");
+    } catch (error) {
+      toast.error("核算失败,请重试");
+    } finally {
+      setIsCalculating(false);
+    }
   };
 
   const handleReset = () => {
@@ -180,11 +188,30 @@ export default function PurchaseCalculator() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <Button onClick={handleCalculate} size="lg" className="flex-1">
-                <Calculator className="w-4 h-4 mr-2" />
-                开始核算
+              <Button 
+                onClick={handleCalculate} 
+                size="lg" 
+                className="flex-1"
+                disabled={isCalculating}
+              >
+                {isCalculating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    计算中...
+                  </>
+                ) : (
+                  <>
+                    <Calculator className="w-4 h-4 mr-2" />
+                    开始核算
+                  </>
+                )}
               </Button>
-              <Button onClick={handleReset} variant="outline" size="lg">
+              <Button 
+                onClick={handleReset} 
+                variant="outline" 
+                size="lg"
+                disabled={isCalculating}
+              >
                 重置
               </Button>
             </div>
@@ -192,7 +219,18 @@ export default function PurchaseCalculator() {
         </Card>
 
         {/* 最优方案推荐 */}
-        {showResults && optimalPlan && (
+        {showResults && isCalculating && (
+          <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+            <CardContent className="py-12">
+              <div className="flex flex-col items-center justify-center gap-4">
+                <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+                <p className="text-lg font-medium text-blue-700">正在计算最优方案...</p>
+                <p className="text-sm text-muted-foreground">请稍候,我们正在为您分析最佳进货策略</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {showResults && !isCalculating && optimalPlan && (
           <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-700">
@@ -253,7 +291,7 @@ export default function PurchaseCalculator() {
         )}
 
         {/* 方案对比表格 */}
-        {showResults && plans && plans.length > 0 && (
+        {showResults && !isCalculating && plans && plans.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle>方案对比</CardTitle>
