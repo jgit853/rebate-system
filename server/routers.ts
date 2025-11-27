@@ -198,6 +198,17 @@ export const appRouter = router({
       return await db.getActivePeriod();
     }),
 
+    // 获取所有周期列表（用于历史查询）
+    getAllPeriods: publicProcedure.query(async () => {
+      const database = await getDb();
+      if (!database) return [];
+
+      return await database
+        .select()
+        .from(settlementPeriods)
+        .orderBy(desc(settlementPeriods.startDate));
+    }),
+
     // 获取经销商的结算数据
     getMySettlement: publicProcedure
       .input(

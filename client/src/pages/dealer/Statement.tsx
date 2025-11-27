@@ -1,4 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { formatMoney, formatRate, formatDate } from "@/lib/format";
 import { 
@@ -9,7 +10,8 @@ import {
   Calendar,
   Award,
   Sparkles,
-  AlertTriangle
+  AlertTriangle,
+  ArrowLeft
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -17,6 +19,7 @@ import { useLocation } from "wouter";
 export default function DealerStatement() {
   const [, setLocation] = useLocation();
   const [dealerInfo, setDealerInfo] = useState<{ id: number; name: string } | null>(null);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("dealerToken");
@@ -36,20 +39,33 @@ export default function DealerStatement() {
   }, [setLocation]);
 
   const { data: activePeriod, isLoading: isPeriodLoading } = trpc.dealerApi.getActivePeriod.useQuery();
+  const { data: allPeriods } = trpc.dealerApi.getAllPeriods.useQuery();
+  
+  // 当活跃周期加载完成且还没有选择周期时，默认选择活跃周期
+  useEffect(() => {
+    if (activePeriod && !selectedPeriodId) {
+      setSelectedPeriodId(activePeriod.id);
+    }
+  }, [activePeriod, selectedPeriodId]);
+
+  // 使用选中的周期ID或活跃周期ID
+  const currentPeriodId = selectedPeriodId || activePeriod?.id || 0;
+  const currentPeriod = allPeriods?.find(p => p.id === currentPeriodId) || activePeriod;
+
   const { data: settlement } = trpc.dealerApi.getMySettlement.useQuery(
     {
       dealerId: dealerInfo?.id || 0,
-      periodId: activePeriod?.id || 0,
+      periodId: currentPeriodId,
     },
-    { enabled: !!dealerInfo && !!activePeriod }
+    { enabled: !!dealerInfo && !!currentPeriodId }
   );
 
   // 暂时不显示下级佣金,因为API尚未实现
   const subCommissions: any[] = [];
 
   const { data: marketFunds } = trpc.dealerApi.getMyMarketFunds.useQuery(
-    { dealerId: dealerInfo?.id || 0, periodId: activePeriod?.id || 0 },
-    { enabled: !!dealerInfo && !!activePeriod }
+    { dealerId: dealerInfo?.id || 0, periodId: currentPeriodId },
+    { enabled: !!dealerInfo && !!currentPeriodId }
   );
 
   // 正在加载经销商信息或周期数据
@@ -64,58 +80,12 @@ export default function DealerStatement() {
     );
   }
 
-  // 没有活跃周期
-  if (!activePeriod) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
-        <div className="container max-w-4xl mx-auto">
-          <Card className="border-2 border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white">
-              <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                <Calendar className="h-6 w-6" />
-                当前结算周期
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="text-center py-8">
-                <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
-                <p className="text-gray-600 text-lg">暂无活跃周期</p>
-                <p className="text-gray-500 mt-2">当前没有进行中的结算周期，请联系管理员创建。</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // 有周期但没有结算数据
-  if (!settlement) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
-        <div className="container max-w-4xl mx-auto">
-          <Card className="border-2 border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white">
-              <CardTitle className="text-2xl">欢迎,{dealerInfo.name}</CardTitle>
-              <CardDescription className="text-blue-100">
-                当前结算周期: {activePeriod.name}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-8 text-center">
-              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 text-lg">本周期暂无结算数据</p>
-              <p className="text-gray-500 mt-2">请联系管理员生成结算单</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  // 准备数据(即使没有周期或结算数据也继续渲染,让用户可以选择历史周期)
 
   const totalSubCommission = subCommissions?.reduce((sum: number, c: any) => sum + c.commissionAmount, 0) || 0;
   const marketFundBalance = marketFunds?.reduce((sum: number, f: any) => sum + (f.type === "accrual" ? f.amount : -f.amount), 0) || 0;
 
-  const benefitCards = [
+  const benefitCards = settlement ? [
     {
       title: "阶梯返利",
       amount: settlement.rebateAmount,
@@ -144,7 +114,7 @@ export default function DealerStatement() {
       color: "from-orange-500 to-red-500",
       description: "本期合计",
     },
-  ];
+  ] : []
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
@@ -155,19 +125,46 @@ export default function DealerStatement() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-3xl font-bold flex items-center gap-2">
+                  <button
+                    onClick={() => setLocation("/dealer/dashboard")}
+                    className="hover:bg-white/20 p-2 rounded-lg transition-colors mr-2"
+                    title="返回仪表盘"
+                  >
+                    <ArrowLeft className="w-6 h-6" />
+                  </button>
                   <Sparkles className="w-8 h-8" />
                   {dealerInfo.name} 的收益报告
                 </CardTitle>
                 <CardDescription className="text-blue-100 text-lg mt-2">
-                  {activePeriod.name} ({formatDate(activePeriod.startDate)} - {formatDate(activePeriod.endDate)})
+                  <div className="flex items-center gap-3">
+                    <span>结算周期：</span>
+                    <Select
+                      value={currentPeriodId?.toString()}
+                      onValueChange={(value) => setSelectedPeriodId(Number(value))}
+                    >
+                      <SelectTrigger className="w-[300px] bg-white/10 border-white/30 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allPeriods?.map((period) => (
+                          <SelectItem key={period.id} value={period.id.toString()}>
+                            {period.name} ({formatDate(period.startDate)} - {formatDate(period.endDate)})
+                            {period.isActive && " [活跃]"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </CardDescription>
               </div>
-              <div className="text-right">
-                <div className="text-sm text-blue-200">结算状态</div>
-                <div className="text-2xl font-bold">
-                  {settlement.status === "approved" ? "✓ 已审批" : settlement.status === "paid" ? "✓ 已支付" : "处理中"}
+              {settlement && (
+                <div className="text-right">
+                  <div className="text-sm text-blue-200">结算状态</div>
+                  <div className="text-2xl font-bold">
+                    {settlement.status === "approved" ? "✓ 已审批" : settlement.status === "paid" ? "✓ 已支付" : "处理中"}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </CardHeader>
         </Card>
@@ -193,49 +190,63 @@ export default function DealerStatement() {
         </div>
 
         {/* 阶梯返利明细 */}
-        <Card className="border-2 border-green-200 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50">
-            <CardTitle className="text-xl flex items-center gap-2">
-              <TrendingUp className="w-6 h-6 text-green-600" />
-              阶梯返利明细
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-600">年度回款</div>
-                <div className="text-2xl font-bold text-blue-600">{formatMoney(settlement.totalPaymentAmount)}</div>
-              </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-600">年度基数</div>
-                <div className="text-2xl font-bold text-purple-600">{(settlement.totalBaseUnit / 100).toFixed(2)}</div>
-              </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-600">基础返利比例</div>
-                <div className="text-2xl font-bold text-green-600">{formatRate(settlement.baseRebateRate)}</div>
-              </div>
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-600">最终返利比例</div>
-                <div className="text-2xl font-bold text-orange-600">{formatRate(settlement.adjustedRebateRate)}</div>
-              </div>
-            </div>
-            
-            {settlement.overdueRatio > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                <div className="flex items-center gap-2 text-yellow-800">
-                  <span className="font-semibold">超期比例:</span>
-                  <span>{formatRate(settlement.overdueRatio)}</span>
-                  <span className="text-sm">({formatMoney(settlement.overdueAmount)} 超期款项)</span>
+        {settlement ? (
+          <Card className="border-2 border-green-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50">
+              <CardTitle className="text-xl flex items-center gap-2">
+                <TrendingUp className="w-6 h-6 text-green-600" />
+                阶梯返利明细
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="text-sm text-gray-600">年度回款</div>
+                  <div className="text-2xl font-bold text-blue-600">{formatMoney(settlement.totalPaymentAmount)}</div>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <div className="text-sm text-gray-600">年度基数</div>
+                  <div className="text-2xl font-bold text-purple-600">{(settlement.totalBaseUnit / 100).toFixed(2)}</div>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="text-sm text-gray-600">基础返利比例</div>
+                  <div className="text-2xl font-bold text-green-600">{formatRate(settlement.baseRebateRate)}</div>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-lg">
+                  <div className="text-sm text-gray-600">最终返利比例</div>
+                  <div className="text-2xl font-bold text-orange-600">{formatRate(settlement.adjustedRebateRate)}</div>
                 </div>
               </div>
-            )}
+              
+              {settlement.overdueRatio > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 text-yellow-800">
+                    <span className="font-semibold">超期比例:</span>
+                    <span>{formatRate(settlement.overdueRatio)}</span>
+                    <span className="text-sm">({formatMoney(settlement.overdueAmount)} 超期款项)</span>
+                  </div>
+                </div>
+              )}
 
-            <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg p-6 text-center">
-              <div className="text-lg mb-2">本期返利收益</div>
-              <div className="text-4xl font-bold">{formatMoney(settlement.rebateAmount)}</div>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg p-6 text-center">
+                <div className="text-lg mb-2">本期返利收益</div>
+                <div className="text-4xl font-bold">{formatMoney(settlement.rebateAmount)}</div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-2 border-yellow-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-yellow-50 to-orange-50">
+              <CardTitle className="text-xl flex items-center gap-2">
+                <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                暂无结算数据
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 text-center">
+              <p className="text-gray-600">当前周期没有结算数据，请选择其他周期或联系管理员。</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 下级客户佣金明细 */}
         {subCommissions && subCommissions.length > 0 && (
