@@ -250,6 +250,59 @@ export const appRouter = router({
           .orderBy(desc(marketFunds.recordDate));
       }),
 
+    // 保存进货核算历史记录
+    saveCalculationHistory: publicProcedure
+      .input(
+        z.object({
+          dealerId: z.number(),
+          currentPayment: z.number(),
+          maxBudget: z.number().optional(),
+          customAmounts: z.string().optional(),
+          optimalTargetAmount: z.number().optional(),
+          optimalRebateAmount: z.number().optional(),
+          optimalMarketFund: z.number().optional(),
+          optimalTotalBenefit: z.number().optional(),
+          optimalTierName: z.string().optional(),
+          plansData: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const id = await db.saveCalculationHistory(input);
+        return { id, success: true };
+      }),
+
+    // 获取历史记录列表
+    getCalculationHistory: publicProcedure
+      .input(
+        z.object({
+          dealerId: z.number(),
+          limit: z.number().optional().default(20),
+        })
+      )
+      .query(async ({ input }) => {
+        return await db.getCalculationHistoryByDealer(input.dealerId, input.limit);
+      }),
+
+    // 获取单条历史记录详情
+    getCalculationHistoryDetail: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getCalculationHistoryById(input.id);
+      }),
+
+    // 删除历史记录
+    deleteCalculationHistory: publicProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          dealerId: z.number(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const success = await db.deleteCalculationHistory(input.id, input.dealerId);
+        return { success };
+      }),
+
     // 获取政策参数（经销商可见）
     getPolicySettings: publicProcedure.query(async () => {
       const settings = await db.getPolicySettings();

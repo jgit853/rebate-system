@@ -242,3 +242,30 @@ export const policySettings = mysqlTable("policy_settings", {
 
 export type PolicySetting = typeof policySettings.$inferSelect;
 export type InsertPolicySetting = typeof policySettings.$inferInsert;
+
+/**
+ * 进货核算历史记录表 - 保存经销商的进货核算查询历史
+ */
+export const calculationHistory = mysqlTable("calculationHistory", {
+  id: int("id").autoincrement().primaryKey(),
+  dealerId: int("dealerId").notNull(), // 经销商ID
+  // 输入参数
+  currentPayment: int("currentPayment").notNull(), // 当前已回款金额(分)
+  maxBudget: int("maxBudget"), // 最大追加预算(分)
+  customAmounts: text("customAmounts"), // 自定义金额列表,JSON格式
+  // 最优方案结果
+  optimalTargetAmount: int("optimalTargetAmount"), // 最优目标金额(分)
+  optimalRebateAmount: int("optimalRebateAmount"), // 最优阶梯返利(分)
+  optimalMarketFund: int("optimalMarketFund"), // 最优市场基金(分)
+  optimalTotalBenefit: int("optimalTotalBenefit"), // 最优总收益(分)
+  optimalTierName: varchar("optimalTierName", { length: 100 }), // 最优所在阶梯
+  // 方案对比结果
+  plansData: text("plansData"), // 所有方案对比数据,JSON格式
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  dealerIdx: index("dealer_idx").on(table.dealerId),
+  createdAtIdx: index("created_at_idx").on(table.createdAt),
+}));
+
+export type CalculationHistory = typeof calculationHistory.$inferSelect;
+export type InsertCalculationHistory = typeof calculationHistory.$inferInsert;

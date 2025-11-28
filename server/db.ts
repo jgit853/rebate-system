@@ -13,6 +13,7 @@ import {
   subCommissions,
   marketFunds,
   policySettings,
+  calculationHistory,
   type Dealer,
   type Product,
   type Order,
@@ -21,6 +22,8 @@ import {
   type AnnualSettlement,
   type PolicySetting,
   type InsertPolicySetting,
+  type CalculationHistory,
+  type InsertCalculationHistory,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -311,4 +314,66 @@ export async function initDefaultPolicySettings(): Promise<void> {
   if (!existing) {
     await updatePolicySettings({ updatedBy: 0 });
   }
+}
+
+
+// ==================== 进货核算历史记录 ====================
+
+/**
+ * 保存进货核算历史记录
+ */
+export async function saveCalculationHistory(data: InsertCalculationHistory): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(calculationHistory).values(data);
+  return result[0].insertId;
+}
+
+/**
+ * 获取经销商的历史核算记录列表
+ */
+export async function getCalculationHistoryByDealer(dealerId: number, limit: number = 20): Promise<CalculationHistory[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(calculationHistory)
+    .where(eq(calculationHistory.dealerId, dealerId))
+    .orderBy(desc(calculationHistory.createdAt))
+    .limit(limit);
+}
+
+/**
+ * 获取单条历史记录详情
+ */
+export async function getCalculationHistoryById(id: number): Promise<CalculationHistory | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(calculationHistory)
+    .where(eq(calculationHistory.id, id))
+    .limit(1);
+
+  return result[0];
+}
+
+/**
+ * 删除历史记录
+ */
+export async function deleteCalculationHistory(id: number, dealerId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const result = await db
+    .delete(calculationHistory)
+    .where(and(
+      eq(calculationHistory.id, id),
+      eq(calculationHistory.dealerId, dealerId)
+    ));
+
+  return result[0].affectedRows > 0;
 }

@@ -14,7 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/lib/format";
 import { Calculator, TrendingUp, Lightbulb, Target, ArrowLeft, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 export default function PurchaseCalculator() {
@@ -25,9 +25,20 @@ export default function PurchaseCalculator() {
 
   const [showResults, setShowResults] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [dealerInfo, setDealerInfo] = useState<{ id: number; code: string; name: string } | null>(null);
+
+  useEffect(() => {
+    const storedInfo = localStorage.getItem("dealerInfo");
+    if (storedInfo) {
+      setDealerInfo(JSON.parse(storedInfo));
+    }
+  }, []);
 
   // 获取政策参数
   const { data: policySettings } = trpc.dealerApi.getPolicySettings.useQuery();
+
+  // 保存历史记录
+  const saveHistory = trpc.dealerApi.saveCalculationHistory.useMutation();
 
   // 生成方案对比
   const { data: plans, refetch: refetchPlans } = trpc.purchaseCalculator.generatePlans.useQuery(
@@ -66,14 +77,35 @@ export default function PurchaseCalculator() {
     setShowResults(true);
 
     try {
+      let latestPlans = plans;
+      let latestOptimal = optimalPlan;
+
       // 如果有自定义金额,生成对比方案
       if (validCustomAmounts.length > 0) {
-        await refetchPlans();
+        const result = await refetchPlans();
+        latestPlans = result.data;
       }
 
       // 如果有最大预算,找到最优方案
       if (maxBudget && parseFloat(maxBudget) > 0) {
-        await refetchOptimal();
+        const result = await refetchOptimal();
+        latestOptimal = result.data;
+      }
+
+      // 保存历史记录
+      if (dealerInfo) {
+        await saveHistory.mutateAsync({
+          dealerId: dealerInfo.id,
+          currentPayment: Math.round(parseFloat(currentPayment) * 100),
+          maxBudget: maxBudget ? Math.round(parseFloat(maxBudget) * 100) : undefined,
+          customAmounts: validCustomAmounts.length > 0 ? JSON.stringify(validCustomAmounts.map(a => Math.round(parseFloat(a) * 100))) : undefined,
+          optimalTargetAmount: latestOptimal?.targetAmount,
+          optimalRebateAmount: latestOptimal?.rebateAmount,
+          optimalMarketFund: latestOptimal?.marketFund,
+          optimalTotalBenefit: latestOptimal?.totalBenefit,
+          optimalTierName: latestOptimal?.tierName,
+          plansData: latestPlans ? JSON.stringify(latestPlans) : undefined,
+        });
       }
 
       toast.success("核算完成");

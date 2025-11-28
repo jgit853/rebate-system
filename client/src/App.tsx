@@ -15,6 +15,7 @@ import SetPassword from "./pages/dealer/SetPassword";
 import ChangePassword from "./pages/dealer/ChangePassword";
 import DealerStatement from "./pages/dealer/Statement";
 import PurchaseCalculator from "./pages/dealer/PurchaseCalculator";
+import CalculationHistory from "./pages/dealer/CalculationHistory";
 import Products from "./pages/admin/Products";
 import Orders from "./pages/admin/Orders";
 import Periods from "./pages/admin/Periods";
@@ -38,6 +39,7 @@ function Router() {
       <Route path={"/dealer/change-password"} component={ChangePassword} />
       <Route path={"/dealer/statement"} component={DealerStatement} />
       <Route path={"/dealer/calculator"} component={PurchaseCalculator} />
+      <Route path={"/dealer/history"} component={CalculationHistory} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>
