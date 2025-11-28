@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/lib/format";
-import { History, ArrowLeft, Trash2, Eye } from "lucide-react";
+import { History, ArrowLeft, Trash2, Eye, TrendingUp, BarChart3 } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -44,6 +45,17 @@ export default function CalculationHistory() {
     { dealerId: dealerInfo?.id || 0 },
     { enabled: !!dealerInfo }
   );
+
+  // 准备图表数据
+  const chartData = historyList?.map((record, index) => ({
+    name: `第${historyList.length - index}次`,
+    date: new Date(record.createdAt).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }),
+    总收益: record.optimalTotalBenefit ? record.optimalTotalBenefit / 100 : 0,
+    阶梯返利: record.optimalRebateAmount ? record.optimalRebateAmount / 100 : 0,
+    市场基金: record.optimalMarketFund ? record.optimalMarketFund / 100 : 0,
+    目标进货: record.optimalTargetAmount ? record.optimalTargetAmount / 100 : 0,
+    当前回款: record.currentPayment / 100,
+  })).reverse() || [];
 
   // 删除历史记录
   const deleteMutation = trpc.dealerApi.deleteCalculationHistory.useMutation({
@@ -92,6 +104,121 @@ export default function CalculationHistory() {
             <p className="text-gray-600">查看和管理您的进货核算历史</p>
           </div>
         </div>
+
+        {/* 数据可视化图表 */}
+        {historyList && historyList.length > 0 && chartData.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 收益趋势图 */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-blue-600" />
+                  <CardTitle>收益趋势分析</CardTitle>
+                </div>
+                <CardDescription>历史核算总收益变化趋势</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fontSize: 12 }}
+                      stroke="#666"
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12 }}
+                      stroke="#666"
+                      tickFormatter={(value) => `¥${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => `¥${value.toLocaleString()}`}
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="总收益" 
+                      stroke="#3b82f6" 
+                      strokeWidth={2}
+                      dot={{ fill: '#3b82f6', r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="阶梯返利" 
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                      dot={{ fill: '#10b981', r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="市场基金" 
+                      stroke="#f59e0b" 
+                      strokeWidth={2}
+                      dot={{ fill: '#f59e0b', r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* 进货金额对比图 */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-purple-600" />
+                  <CardTitle>进货金额对比</CardTitle>
+                </div>
+                <CardDescription>当前回款与目标进货金额对比</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fontSize: 12 }}
+                      stroke="#666"
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12 }}
+                      stroke="#666"
+                      tickFormatter={(value) => `¥${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => `¥${value.toLocaleString()}`}
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Legend />
+                    <Bar 
+                      dataKey="当前回款" 
+                      fill="#8b5cf6" 
+                      radius={[8, 8, 0, 0]}
+                    />
+                    <Bar 
+                      dataKey="目标进货" 
+                      fill="#06b6d4" 
+                      radius={[8, 8, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* 历史记录列表 */}
         <Card>
