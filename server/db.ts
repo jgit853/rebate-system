@@ -157,6 +157,22 @@ export async function getProductById(id: number): Promise<Product | undefined> {
 
 // ==================== 订单相关查询 ====================
 
+export async function getAllOrders(dealerId?: number, status?: "pending" | "paid" | "cancelled", type?: "normal" | "gift" | "special"): Promise<Order[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (dealerId) conditions.push(eq(orders.dealerId, dealerId));
+  if (status) conditions.push(eq(orders.status, status));
+  if (type) conditions.push(eq(orders.type, type));
+
+  if (conditions.length > 0) {
+    return await db.select().from(orders).where(and(...conditions)).orderBy(desc(orders.orderDate));
+  }
+
+  return await db.select().from(orders).orderBy(desc(orders.orderDate));
+}
+
 export async function getOrdersByDealer(dealerId: number, periodId?: number): Promise<Order[]> {
   const db = await getDb();
   if (!db) return [];

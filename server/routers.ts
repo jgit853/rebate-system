@@ -576,6 +576,18 @@ export const appRouter = router({
 
   // 订单和回款管理
   orders: router({
+    list: protectedProcedure
+      .input(
+        z.object({
+          dealerId: z.number().optional(),
+          status: z.enum(["pending", "paid", "cancelled"]).optional(),
+          type: z.enum(["normal", "gift", "special"]).optional(),
+        })
+      )
+      .query(async ({ input }) => {
+        return await db.getAllOrders(input.dealerId, input.status, input.type);
+      }),
+
     getByDealer: protectedProcedure
       .input(
         z.object({
@@ -702,6 +714,85 @@ export const appRouter = router({
       .input(z.object({ orderId: z.number() }))
       .query(async ({ input }) => {
         return await db.getPaymentsByOrder(input.orderId);
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          orderNumber: z.string().optional(),
+          dealerId: z.number().optional(),
+          orderDate: z.string().optional(),
+          dueDate: z.string().optional(),
+          type: z.enum(["normal", "gift", "special"]).optional(),
+          status: z.enum(["pending", "paid", "cancelled"]).optional(),
+          items: z.array(
+            z.object({
+              productId: z.number(),
+              quantity: z.number(),
+              price: z.number(),
+            })
+          ).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        const updateData: any = {};
+        if (input.orderNumber) updateData.orderNumber = input.orderNumber;
+        if (input.dealerId) updateData.dealerId = input.dealerId;
+        if (input.orderDate) updateData.orderDate = new Date(input.orderDate);
+        if (input.dueDate) updateData.dueDate = new Date(input.dueDate);
+        if (input.type) updateData.type = input.type;
+        if (input.status) updateData.status = input.status;
+
+        // 如果有订单明细更新,先删除旧明细再插入新明细
+        if (input.items && input.items.length > 0) {
+          const totalAmount = input.items.reduce(
+            (sum, item) => sum + item.price * item.quantity,
+            0
+          );
+          updateData.totalAmount = totalAmount;
+
+          // 删除旧订单明细
+          await database.delete(orderItems).where(eq(orderItems.orderId, input.id));
+
+          // 插入新订单明细
+          for (const item of input.items) {
+            await database.insert(orderItems).values({
+              orderId: input.id,
+              productId: item.productId,
+              quantity: item.quantity,
+              price: item.price,
+              itemAmount: item.price * item.quantity,
+            });
+          }
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await database.update(orders).set(updateData).where(eq(orders.id, input.id));
+        }
+
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        // 先删除订单明细
+        await database.delete(orderItems).where(eq(orderItems.orderId, input.id));
+
+        // 删除回款记录
+        await database.delete(payments).where(eq(payments.orderId, input.id));
+
+        // 删除订单
+        await database.delete(orders).where(eq(orders.id, input.id));
+
+        return { success: true };
       }),
   }),
 

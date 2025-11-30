@@ -9,6 +9,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,43 +38,194 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/lib/format";
-import { FileText, Plus, Search, Filter } from "lucide-react";
+import { FileText, Plus, Search, Filter, Edit, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+
+type OrderItem = {
+  productId: number;
+  quantity: number;
+  price: number;
+};
+
+type FormData = {
+  orderNumber: string;
+  dealerId: string;
+  orderDate: string;
+  type: "normal" | "gift" | "special";
+  dueDate: string;
+  items: OrderItem[];
+};
 
 export default function Orders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
-  const { data: allOrders, refetch } = trpc.orders.getByDealer.useQuery(
-    { dealerId: 0 },
-    { enabled: false }
-  );
+  const { data: allOrders, refetch } = trpc.orders.list.useQuery({});
   const orders = allOrders || [];
   const { data: dealers } = trpc.dealers.list.useQuery();
+  const { data: products } = trpc.products.list.useQuery();
   const createMutation = trpc.orders.create.useMutation();
+  const updateMutation = trpc.orders.update.useMutation();
+  const deleteMutation = trpc.orders.delete.useMutation();
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     orderNumber: "",
     dealerId: "",
     orderDate: new Date().toISOString().split("T")[0],
-    type: "normal" as "normal" | "gift" | "special",
+    type: "normal",
     dueDate: "",
-    items: [] as { productId: number; quantity: number; price: number }[],
+    items: [],
   });
 
-  const filteredOrders = orders.filter((order: any) => {   const dealer = dealers?.find((d) => d.id === order.dealerId);
-    const matchesSearch = dealer?.name.toLowerCase().includes(searchTerm.toLowerCase());
+  const [editFormData, setEditFormData] = useState<FormData>({
+    orderNumber: "",
+    dealerId: "",
+    orderDate: "",
+    type: "normal",
+    dueDate: "",
+    items: [],
+  });
+
+  const [currentItem, setCurrentItem] = useState({
+    productId: "",
+    quantity: "",
+    price: "",
+  });
+
+  const filteredOrders = orders.filter((order: any) => {
+    const dealer = dealers?.find((d) => d.id === order.dealerId);
+    const matchesSearch = dealer?.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          order.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     const matchesType = typeFilter === "all" || order.type === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
   });
 
+  const handleAddItem = () => {
+    if (!currentItem.productId || !currentItem.quantity || !currentItem.price) {
+      toast.error("请填写完整的产品信息");
+      return;
+    }
+
+    const newItem: OrderItem = {
+      productId: parseInt(currentItem.productId),
+      quantity: parseInt(currentItem.quantity),
+      price: Math.round(parseFloat(currentItem.price) * 100), // 转换为分
+    };
+
+    setFormData({
+      ...formData,
+      items: [...formData.items, newItem],
+    });
+
+    setCurrentItem({ productId: "", quantity: "", price: "" });
+    toast.success("产品已添加");
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setFormData({
+      ...formData,
+      items: formData.items.filter((_, i) => i !== index),
+    });
+  };
+
   const handleCreate = async () => {
-    toast.info("订单创建功能需要先添加订单明细，请使用经销商详情页面创建订单");
-    setDialogOpen(false);
+    if (!formData.dealerId || !formData.orderDate || !formData.dueDate) {
+      toast.error("请填写所有必填字段");
+      return;
+    }
+
+    if (formData.items.length === 0) {
+      toast.error("请至少添加一个产品");
+      return;
+    }
+
+    if (new Date(formData.orderDate) >= new Date(formData.dueDate)) {
+      toast.error("到期日期必须晚于订单日期");
+      return;
+    }
+
+    try {
+      // 生成订单编号
+      const orderNumber = `ORD-${Date.now()}`;
+      
+      await createMutation.mutateAsync({
+        orderNumber,
+        dealerId: parseInt(formData.dealerId),
+        orderDate: formData.orderDate,
+        dueDate: formData.dueDate,
+        type: formData.type,
+        items: formData.items,
+      });
+
+      toast.success("订单创建成功");
+      setDialogOpen(false);
+      setFormData({
+        orderNumber: "",
+        dealerId: "",
+        orderDate: new Date().toISOString().split("T")[0],
+        type: "normal",
+        dueDate: "",
+        items: [],
+      });
+      refetch();
+    } catch (error) {
+      toast.error("创建失败: " + (error as Error).message);
+    }
+  };
+
+  const handleEdit = (order: any) => {
+    setSelectedOrder(order);
+    setEditFormData({
+      orderNumber: order.orderNumber,
+      dealerId: order.dealerId.toString(),
+      orderDate: new Date(order.orderDate).toISOString().split("T")[0],
+      type: order.type,
+      dueDate: new Date(order.dueDate).toISOString().split("T")[0],
+      items: [], // 需要从orderItems加载
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedOrder) return;
+
+    try {
+      await updateMutation.mutateAsync({
+        id: selectedOrder.id,
+        dealerId: parseInt(editFormData.dealerId),
+        orderDate: editFormData.orderDate,
+        dueDate: editFormData.dueDate,
+        type: editFormData.type,
+      });
+
+      toast.success("订单更新成功");
+      setEditDialogOpen(false);
+      setSelectedOrder(null);
+      refetch();
+    } catch (error) {
+      toast.error("更新失败: " + (error as Error).message);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedOrder) return;
+
+    try {
+      await deleteMutation.mutateAsync({ id: selectedOrder.id });
+      toast.success("订单删除成功");
+      setDeleteDialogOpen(false);
+      setSelectedOrder(null);
+      refetch();
+    } catch (error) {
+      toast.error("删除失败: " + (error as Error).message);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -173,7 +334,7 @@ export default function Orders() {
                 <div className="relative w-48">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
-                    placeholder="搜索经销商..."
+                    placeholder="搜索经销商或订单号..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -209,13 +370,14 @@ export default function Orders() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>订单ID</TableHead>
+                    <TableHead>订单号</TableHead>
                     <TableHead>经销商</TableHead>
                     <TableHead>订单日期</TableHead>
                     <TableHead>订单金额</TableHead>
                     <TableHead>到期日期</TableHead>
                     <TableHead>类型</TableHead>
                     <TableHead>状态</TableHead>
+                    <TableHead>操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -224,19 +386,40 @@ export default function Orders() {
                       const dealer = dealers?.find((d) => d.id === order.dealerId);
                       return (
                         <TableRow key={order.id}>
-                          <TableCell className="font-medium">#{order.id}</TableCell>
+                          <TableCell className="font-medium">{order.orderNumber || `#${order.id}`}</TableCell>
                           <TableCell>{dealer?.name || "-"}</TableCell>
-                          <TableCell>{order.orderDate}</TableCell>
+                          <TableCell>{new Date(order.orderDate).toLocaleDateString('zh-CN')}</TableCell>
                           <TableCell>¥{formatMoney(order.totalAmount)}</TableCell>
-                          <TableCell>{order.dueDate}</TableCell>
+                          <TableCell>{new Date(order.dueDate).toLocaleDateString('zh-CN')}</TableCell>
                           <TableCell>{getTypeBadge(order.type)}</TableCell>
                           <TableCell>{getStatusBadge(order.status)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(order)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedOrder(order);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       );
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground">
                         {searchTerm || statusFilter !== "all" || typeFilter !== "all"
                           ? "未找到匹配的订单"
                           : "暂无订单"}
@@ -251,17 +434,182 @@ export default function Orders() {
 
         {/* 创建订单对话框 */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>新建订单</DialogTitle>
               <DialogDescription>添加新的订单信息到系统</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="dealerId">经销商 *</Label>
+                  <Select
+                    value={formData.dealerId}
+                    onValueChange={(value) => setFormData({ ...formData, dealerId: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择经销商" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dealers?.map((dealer) => (
+                        <SelectItem key={dealer.id} value={dealer.id.toString()}>
+                          {dealer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="type">订单类型</Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value: any) => setFormData({ ...formData, type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="normal">正常订单</SelectItem>
+                      <SelectItem value="gift">赠品订单</SelectItem>
+                      <SelectItem value="special">特殊订单</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="orderDate">订单日期 *</Label>
+                  <Input
+                    id="orderDate"
+                    type="date"
+                    value={formData.orderDate}
+                    onChange={(e) => setFormData({ ...formData, orderDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dueDate">到期日期 *</Label>
+                  <Input
+                    id="dueDate"
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold">订单产品</Label>
+                <div className="mt-2 space-y-2">
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-5">
+                      <Select
+                        value={currentItem.productId}
+                        onValueChange={(value) => {
+                          const product = products?.find(p => p.id === parseInt(value));
+                          setCurrentItem({ 
+                            ...currentItem, 
+                            productId: value,
+                            price: product ? (product.wholesalePrice / 100).toString() : ""
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择产品" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products?.map((product) => (
+                            <SelectItem key={product.id} value={product.id.toString()}>
+                              {product.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        placeholder="数量"
+                        value={currentItem.quantity}
+                        onChange={(e) => setCurrentItem({ ...currentItem, quantity: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="单价(元)"
+                        value={currentItem.price}
+                        onChange={(e) => setCurrentItem({ ...currentItem, price: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <Button type="button" onClick={handleAddItem} className="w-full">
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {formData.items.length > 0 && (
+                    <div className="border rounded-md p-2 space-y-2">
+                      {formData.items.map((item, index) => {
+                        const product = products?.find(p => p.id === item.productId);
+                        return (
+                          <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
+                            <div className="flex-1">
+                              <span className="font-medium">{product?.name}</span>
+                              <span className="text-sm text-muted-foreground ml-2">
+                                x{item.quantity} @ ¥{(item.price / 100).toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">
+                                ¥{((item.price * item.quantity) / 100).toFixed(2)}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveItem(index)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div className="flex justify-end font-bold text-lg pt-2 border-t">
+                        总计: ¥{(formData.items.reduce((sum, item) => sum + item.price * item.quantity, 0) / 100).toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                取消
+              </Button>
+              <Button onClick={handleCreate} disabled={createMutation.isPending}>
+                {createMutation.isPending ? "创建中..." : "创建"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* 编辑订单对话框 */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>编辑订单</DialogTitle>
+              <DialogDescription>修改订单基本信息</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
               <div>
-                <Label htmlFor="dealerId">经销商 *</Label>
+                <Label htmlFor="edit-dealerId">经销商 *</Label>
                 <Select
-                  value={formData.dealerId}
-                  onValueChange={(value) => setFormData({ ...formData, dealerId: value })}
+                  value={editFormData.dealerId}
+                  onValueChange={(value) => setEditFormData({ ...editFormData, dealerId: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="选择经销商" />
@@ -275,30 +623,32 @@ export default function Orders() {
                   </SelectContent>
                 </Select>
               </div>
+
               <div>
-                <Label htmlFor="orderDate">订单日期 *</Label>
+                <Label htmlFor="edit-orderDate">订单日期 *</Label>
                 <Input
-                  id="orderDate"
+                  id="edit-orderDate"
                   type="date"
-                  value={formData.orderDate}
-                  onChange={(e) => setFormData({ ...formData, orderDate: e.target.value })}
+                  value={editFormData.orderDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, orderDate: e.target.value })}
                 />
               </div>
 
               <div>
-                <Label htmlFor="dueDate">到期日期 *</Label>
+                <Label htmlFor="edit-dueDate">到期日期 *</Label>
                 <Input
-                  id="dueDate"
+                  id="edit-dueDate"
                   type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                  value={editFormData.dueDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, dueDate: e.target.value })}
                 />
               </div>
+
               <div>
-                <Label htmlFor="type">订单类型</Label>
+                <Label htmlFor="edit-type">订单类型</Label>
                 <Select
-                  value={formData.type}
-                  onValueChange={(value: any) => setFormData({ ...formData, type: value })}
+                  value={editFormData.type}
+                  onValueChange={(value: any) => setEditFormData({ ...editFormData, type: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -310,18 +660,36 @@ export default function Orders() {
                   </SelectContent>
                 </Select>
               </div>
-
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
                 取消
               </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending}>
-                {createMutation.isPending ? "创建中..." : "创建"}
+              <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "更新中..." : "更新"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* 删除确认对话框 */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除订单</AlertDialogTitle>
+              <AlertDialogDescription>
+                确定要删除订单 {selectedOrder?.orderNumber || `#${selectedOrder?.id}`} 吗？
+                此操作将同时删除订单明细和回款记录，且无法撤销。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? "删除中..." : "确认删除"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );
