@@ -173,8 +173,8 @@ export default function Periods() {
                             {getTypeBadge(period.type)}
                           </span>
                         </TableCell>
-                        <TableCell>{period.startDate}</TableCell>
-                        <TableCell>{period.endDate}</TableCell>
+                        <TableCell>{new Date(period.startDate).toLocaleDateString('zh-CN')}</TableCell>
+                        <TableCell>{new Date(period.endDate).toLocaleDateString('zh-CN')}</TableCell>
                         <TableCell>
                           {period.isActive ? (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
