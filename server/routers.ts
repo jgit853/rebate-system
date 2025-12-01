@@ -223,7 +223,8 @@ export const appRouter = router({
           input.periodId
         );
         // 经销商只能看到自己的数据，不过滤敏感字段
-        return settlement;
+        // 确保总是返回一个值，即使没有找到结算记录
+        return settlement || null;
       }),
 
     // 获取经销商的市场基金记录
