@@ -573,6 +573,21 @@ export const appRouter = router({
 
         return { success: true };
       }),
+
+    setInactive: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("数据库连接失败");
+
+        // 将指定周期设为非活跃
+        await database
+          .update(settlementPeriods)
+          .set({ isActive: false })
+          .where(eq(settlementPeriods.id, input.id));
+
+        return { success: true };
+      }),
   }),
 
   // 订单和回款管理

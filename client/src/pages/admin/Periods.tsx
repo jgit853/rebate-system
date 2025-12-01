@@ -36,6 +36,8 @@ export default function Periods() {
 
   const { data: periods, refetch } = trpc.periods.list.useQuery();
   const createMutation = trpc.periods.create.useMutation();
+  const setActiveMutation = trpc.periods.setActive.useMutation();
+  const setInactiveMutation = trpc.periods.setInactive.useMutation();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -77,7 +79,20 @@ export default function Periods() {
   };
 
   const handleToggleActive = async (id: number, currentStatus: boolean) => {
-    toast.info("周期状态切换功能即将开放");
+    try {
+      if (currentStatus) {
+        // 当前是激活状态,点击停用
+        await setInactiveMutation.mutateAsync({ id });
+        toast.success("周期已停用");
+      } else {
+        // 当前是停用状态,点击激活
+        await setActiveMutation.mutateAsync({ id });
+        toast.success("周期已激活");
+      }
+      refetch();
+    } catch (error) {
+      toast.error("操作失败: " + (error as Error).message);
+    }
   };
 
   const getTypeBadge = (type: string) => {
