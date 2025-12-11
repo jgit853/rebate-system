@@ -12,6 +12,8 @@ import {
   LogOut,
   Menu,
   Settings,
+  UserCog,
+  Megaphone,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
@@ -30,7 +32,10 @@ const navItems: NavItem[] = [
   { label: "订单管理", path: "/admin/orders", icon: <FileText className="w-5 h-5" /> },
   { label: "结算周期", path: "/admin/periods", icon: <Calendar className="w-5 h-5" /> },
   { label: "结算管理", path: "/admin/settlements", icon: <DollarSign className="w-5 h-5" /> },
+  { label: "用户管理", path: "/admin/users", icon: <UserCog className="w-5 h-5" /> },
+  { label: "公告管理", path: "/admin/announcements", icon: <Megaphone className="w-5 h-5" /> },
   { label: "政策设置", path: "/admin/policy-settings", icon: <Settings className="w-5 h-5" /> },
+  { label: "系统设置", path: "/admin/settings", icon: <Settings className="w-5 h-5" /> },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

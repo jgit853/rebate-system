@@ -21,6 +21,9 @@ import * as db from "./db";
 import { hashPassword, verifyPassword, generateDealerToken, verifyDealerToken } from "./auth";
 import { filterSettlementData, filterSettlementList, isAdmin } from "./dataFilter";
 import { generatePurchasePlans, findOptimalPlan } from "./purchaseCalculator";
+import { userManagementRouter } from "./routers/userManagement";
+import { cmsRouter } from "./routers/cms";
+import { systemSettingsRouter } from "./routers/systemSettings";
 
 export const appRouter = router({
   system: systemRouter,
@@ -1104,6 +1107,15 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
+  // 用户管理
+  userManagement: userManagementRouter,
+
+  // 内容管理系统
+  cms: cmsRouter,
+
+  // 系统设置
+  systemSettings: systemSettingsRouter,
 });
 
 export type AppRouter = typeof appRouter;

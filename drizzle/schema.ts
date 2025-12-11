@@ -10,6 +10,7 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  status: mysqlEnum("status", ["active", "disabled"]).default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -269,3 +270,126 @@ export const calculationHistory = mysqlTable("calculationHistory", {
 
 export type CalculationHistory = typeof calculationHistory.$inferSelect;
 export type InsertCalculationHistory = typeof calculationHistory.$inferInsert;
+
+/**
+ * 用户登录日志表 - 记录所有用户的登录历史
+ */
+export const loginLogs = mysqlTable("login_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId"),
+  dealerId: int("dealerId"), // 如果是经销商登录
+  loginType: mysqlEnum("loginType", ["oauth", "dealer"]).notNull(),
+  ipAddress: varchar("ipAddress", { length: 45 }), // 支持IPv6
+  userAgent: text("userAgent"),
+  loginTime: timestamp("loginTime").defaultNow().notNull(),
+  success: boolean("success").notNull(),
+  failReason: text("failReason"),
+}, (table) => ({
+  userIdx: index("user_idx").on(table.userId),
+  dealerIdx: index("dealer_idx").on(table.dealerId),
+  timeIdx: index("time_idx").on(table.loginTime),
+}));
+
+export type LoginLog = typeof loginLogs.$inferSelect;
+export type InsertLoginLog = typeof loginLogs.$inferInsert;
+
+/**
+ * 系统公告表 - 管理系统公告和通知
+ */
+export const announcements = mysqlTable("announcements", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  type: mysqlEnum("type", ["info", "warning", "urgent"]).default("info").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  publishedAt: timestamp("publishedAt"),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  statusIdx: index("status_idx").on(table.status),
+  typeIdx: index("type_idx").on(table.type),
+  publishedAtIdx: index("published_at_idx").on(table.publishedAt),
+}));
+
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertAnnouncement = typeof announcements.$inferInsert;
+
+/**
+ * 帮助文档表 - 管理系统帮助文档和FAQ
+ */
+export const helpDocs = mysqlTable("help_docs", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
+  order: int("order").default(0).notNull(),
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  categoryIdx: index("category_idx").on(table.category),
+  statusIdx: index("status_idx").on(table.status),
+  orderIdx: index("order_idx").on(table.order),
+}));
+
+export type HelpDoc = typeof helpDocs.$inferSelect;
+export type InsertHelpDoc = typeof helpDocs.$inferInsert;
+
+/**
+ * 通知消息表 - 管理系统通知消息
+ */
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  type: mysqlEnum("type", ["system", "settlement", "order", "custom"]).default("system").notNull(),
+  targetType: mysqlEnum("targetType", ["all", "role", "user", "dealer"]).notNull(),
+  targetId: int("targetId"), // 如果targetType是user或dealer,存储对应ID
+  targetRole: mysqlEnum("targetRole", ["admin", "user"]), // 如果targetType是role
+  isRead: boolean("isRead").default(false).notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  targetTypeIdx: index("target_type_idx").on(table.targetType),
+  targetIdIdx: index("target_id_idx").on(table.targetId),
+  isReadIdx: index("is_read_idx").on(table.isRead),
+  createdAtIdx: index("created_at_idx").on(table.createdAt),
+}));
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
+/**
+ * 系统设置表 - 管理系统全局配置
+ */
+export const systemSettings = mysqlTable("system_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  // 基础设置
+  systemName: varchar("systemName", { length: 255 }).notNull(),
+  systemDescription: text("systemDescription"),
+  systemLogo: varchar("systemLogo", { length: 500 }),
+  // 主题设置
+  primaryColor: varchar("primaryColor", { length: 50 }).default("#3b82f6"),
+  theme: mysqlEnum("theme", ["light", "dark", "auto"]).default("light"),
+  // 邮件配置
+  smtpHost: varchar("smtpHost", { length: 255 }),
+  smtpPort: int("smtpPort"),
+  smtpUser: varchar("smtpUser", { length: 255 }),
+  smtpPassword: varchar("smtpPassword", { length: 255 }),
+  smtpFrom: varchar("smtpFrom", { length: 255 }),
+  // 安全设置
+  passwordMinLength: int("passwordMinLength").default(6),
+  sessionTimeout: int("sessionTimeout").default(86400), // 秒
+  enableTwoFactor: boolean("enableTwoFactor").default(false),
+  // 备份设置
+  autoBackup: boolean("autoBackup").default(false),
+  backupFrequency: int("backupFrequency").default(86400), // 秒
+  backupRetentionDays: int("backupRetentionDays").default(7),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedBy: int("updatedBy"),
+});
+
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type InsertSystemSetting = typeof systemSettings.$inferInsert;

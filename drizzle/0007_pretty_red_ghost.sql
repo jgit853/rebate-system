@@ -1,0 +1,22 @@
+CREATE TABLE `system_settings` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`systemName` varchar(255) NOT NULL,
+	`systemDescription` text,
+	`systemLogo` varchar(500),
+	`primaryColor` varchar(50) DEFAULT '#3b82f6',
+	`theme` enum('light','dark','auto') DEFAULT 'light',
+	`smtpHost` varchar(255),
+	`smtpPort` int,
+	`smtpUser` varchar(255),
+	`smtpPassword` varchar(255),
+	`smtpFrom` varchar(255),
+	`passwordMinLength` int DEFAULT 6,
+	`sessionTimeout` int DEFAULT 86400,
+	`enableTwoFactor` boolean DEFAULT false,
+	`autoBackup` boolean DEFAULT false,
+	`backupFrequency` int DEFAULT 86400,
+	`backupRetentionDays` int DEFAULT 7,
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	`updatedBy` int,
+	CONSTRAINT `system_settings_id` PRIMARY KEY(`id`)
+);

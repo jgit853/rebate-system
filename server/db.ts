@@ -14,6 +14,11 @@ import {
   marketFunds,
   policySettings,
   calculationHistory,
+  loginLogs,
+  announcements,
+  helpDocs,
+  notifications,
+  systemSettings,
   type Dealer,
   type Product,
   type Order,
@@ -392,4 +397,468 @@ export async function deleteCalculationHistory(id: number, dealerId: number): Pr
     ));
 
   return result[0].affectedRows > 0;
+}
+
+// ==========================================
+// 用户管理功能
+// ==========================================
+
+/**
+ * 获取所有用户列表(管理员功能)
+ */
+export async function getAllUsers() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(users)
+    .orderBy(desc(users.createdAt));
+}
+
+/**
+ * 更新用户角色
+ */
+export async function updateUserRole(userId: number, role: "user" | "admin"): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const result = await db
+    .update(users)
+    .set({ role, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+
+  return result[0].affectedRows > 0;
+}
+
+/**
+ * 更新用户状态(启用/禁用)
+ */
+export async function updateUserStatus(userId: number, status: "active" | "disabled"): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const result = await db
+    .update(users)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+
+  return result[0].affectedRows > 0;
+}
+
+/**
+ * 删除用户
+ */
+export async function deleteUser(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const result = await db
+    .delete(users)
+    .where(eq(users.id, userId));
+
+  return result[0].affectedRows > 0;
+}
+
+/**
+ * 记录登录日志
+ */
+export async function createLoginLog(log: {
+  userId?: number;
+  dealerId?: number;
+  loginType: "oauth" | "dealer";
+  ipAddress?: string;
+  userAgent?: string;
+  success: boolean;
+  failReason?: string;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.insert(loginLogs).values({
+    ...log,
+    loginTime: new Date(),
+  });
+}
+
+/**
+ * 获取用户登录历史
+ */
+export async function getUserLoginLogs(userId: number, limit: number = 50) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(loginLogs)
+    .where(eq(loginLogs.userId, userId))
+    .orderBy(desc(loginLogs.loginTime))
+    .limit(limit);
+}
+
+/**
+ * 获取经销商登录历史
+ */
+export async function getDealerLoginLogs(dealerId: number, limit: number = 50) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(loginLogs)
+    .where(eq(loginLogs.dealerId, dealerId))
+    .orderBy(desc(loginLogs.loginTime))
+    .limit(limit);
+}
+
+/**
+ * 获取所有登录日志(管理员功能)
+ */
+export async function getAllLoginLogs(limit: number = 100) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(loginLogs)
+    .orderBy(desc(loginLogs.loginTime))
+    .limit(limit);
+}
+
+// ==========================================
+// 内容管理系统(CMS)功能
+// ==========================================
+
+/**
+ * 公告管理
+ */
+export async function getAllAnnouncements(status?: "draft" | "published" | "archived") {
+  const db = await getDb();
+  if (!db) return [];
+
+  if (status) {
+    return await db
+      .select()
+      .from(announcements)
+      .where(eq(announcements.status, status))
+      .orderBy(desc(announcements.createdAt));
+  }
+
+  return await db
+    .select()
+    .from(announcements)
+    .orderBy(desc(announcements.createdAt));
+}
+
+export async function getPublishedAnnouncements() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(announcements)
+    .where(eq(announcements.status, "published"))
+    .orderBy(desc(announcements.publishedAt));
+}
+
+export async function getAnnouncementById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(announcements)
+    .where(eq(announcements.id, id))
+    .limit(1);
+
+  return result[0];
+}
+
+export async function createAnnouncement(data: {
+  title: string;
+  content: string;
+  type: "info" | "warning" | "urgent";
+  status: "draft" | "published" | "archived";
+  createdBy: number;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(announcements).values({
+    ...data,
+    publishedAt: data.status === "published" ? new Date() : null,
+  });
+
+  return result[0].insertId;
+}
+
+export async function updateAnnouncement(
+  id: number,
+  data: Partial<{
+    title: string;
+    content: string;
+    type: "info" | "warning" | "urgent";
+    status: "draft" | "published" | "archived";
+  }>
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const updateData: any = { ...data };
+  
+  // 如果状态变为published且之前没有发布时间,设置发布时间
+  if (data.status === "published") {
+    const current = await getAnnouncementById(id);
+    if (current && !current.publishedAt) {
+      updateData.publishedAt = new Date();
+    }
+  }
+
+  const result = await db
+    .update(announcements)
+    .set(updateData)
+    .where(eq(announcements.id, id));
+
+  return result[0].affectedRows > 0;
+}
+
+export async function deleteAnnouncement(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const result = await db
+    .delete(announcements)
+    .where(eq(announcements.id, id));
+
+  return result[0].affectedRows > 0;
+}
+
+/**
+ * 帮助文档管理
+ */
+export async function getAllHelpDocs(status?: "draft" | "published") {
+  const db = await getDb();
+  if (!db) return [];
+
+  if (status) {
+    return await db
+      .select()
+      .from(helpDocs)
+      .where(eq(helpDocs.status, status))
+      .orderBy(helpDocs.order, desc(helpDocs.createdAt));
+  }
+
+  return await db
+    .select()
+    .from(helpDocs)
+    .orderBy(helpDocs.order, desc(helpDocs.createdAt));
+}
+
+export async function getHelpDocsByCategory(category: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(helpDocs)
+    .where(and(eq(helpDocs.category, category), eq(helpDocs.status, "published")))
+    .orderBy(helpDocs.order);
+}
+
+export async function getHelpDocById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(helpDocs)
+    .where(eq(helpDocs.id, id))
+    .limit(1);
+
+  return result[0];
+}
+
+export async function createHelpDoc(data: {
+  title: string;
+  content: string;
+  category: string;
+  order?: number;
+  status: "draft" | "published";
+  createdBy: number;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(helpDocs).values(data);
+
+  return result[0].insertId;
+}
+
+export async function updateHelpDoc(
+  id: number,
+  data: Partial<{
+    title: string;
+    content: string;
+    category: string;
+    order: number;
+    status: "draft" | "published";
+  }>
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const result = await db
+    .update(helpDocs)
+    .set(data)
+    .where(eq(helpDocs.id, id));
+
+  return result[0].affectedRows > 0;
+}
+
+export async function deleteHelpDoc(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const result = await db
+    .delete(helpDocs)
+    .where(eq(helpDocs.id, id));
+
+  return result[0].affectedRows > 0;
+}
+
+/**
+ * 通知消息管理
+ */
+export async function getAllNotifications() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(notifications)
+    .orderBy(desc(notifications.createdAt));
+}
+
+export async function getUserNotifications(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.targetType, "user"),
+        eq(notifications.targetId, userId)
+      )
+    )
+    .orderBy(desc(notifications.createdAt));
+}
+
+export async function createNotification(data: {
+  title: string;
+  content: string;
+  type: "system" | "settlement" | "order" | "custom";
+  targetType: "all" | "role" | "user" | "dealer";
+  targetId?: number;
+  targetRole?: "admin" | "user";
+  createdBy: number;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(notifications).values(data);
+
+  return result[0].insertId;
+}
+
+export async function markNotificationAsRead(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const result = await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(eq(notifications.id, id));
+
+  return result[0].affectedRows > 0;
+}
+
+export async function deleteNotification(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const result = await db
+    .delete(notifications)
+    .where(eq(notifications.id, id));
+
+  return result[0].affectedRows > 0;
+}
+
+// ==========================================
+// 系统设置功能
+// ==========================================
+
+/**
+ * 获取系统设置(始终返回第一条记录)
+ */
+export async function getSystemSettings() {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(systemSettings)
+    .limit(1);
+
+  return result[0];
+}
+
+/**
+ * 更新或创建系统设置
+ */
+export async function upsertSystemSettings(
+  data: Partial<{
+    systemName: string;
+    systemDescription: string;
+    systemLogo: string;
+    primaryColor: string;
+    theme: "light" | "dark" | "auto";
+    smtpHost: string;
+    smtpPort: number;
+    smtpUser: string;
+    smtpPassword: string;
+    smtpFrom: string;
+    passwordMinLength: number;
+    sessionTimeout: number;
+    enableTwoFactor: boolean;
+    autoBackup: boolean;
+    backupFrequency: number;
+    backupRetentionDays: number;
+  }>,
+  updatedBy: number
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const existing = await getSystemSettings();
+
+  if (existing) {
+    // 更新现有设置
+    const result = await db
+      .update(systemSettings)
+      .set({ ...data, updatedBy })
+      .where(eq(systemSettings.id, existing.id));
+
+    return result[0].affectedRows > 0;
+  } else {
+    // 创建新设置
+    await db.insert(systemSettings).values({
+      systemName: data.systemName || "经销商返利对账系统",
+      ...data,
+      updatedBy,
+    });
+
+    return true;
+  }
 }

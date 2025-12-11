@@ -20,6 +20,9 @@ import Products from "./pages/admin/Products";
 import Orders from "./pages/admin/Orders";
 import Periods from "./pages/admin/Periods";
 import PolicySettings from "./pages/admin/PolicySettings";
+import UserManagementPage from "./pages/admin/UserManagementPage";
+import AnnouncementsPage from "./pages/admin/AnnouncementsPage";
+import SystemSettingsPage from "./pages/admin/SystemSettingsPage";
 
 function Router() {
   return (
@@ -33,6 +36,9 @@ function Router() {
       <Route path={"/admin/periods"} component={Periods} />
       <Route path={"/admin/policy-settings"} component={PolicySettings} />
       <Route path={"/admin/settlements"} component={Settlements} />
+      <Route path={"/admin/users"} component={UserManagementPage} />
+      <Route path="/admin/announcements" component={AnnouncementsPage} />
+      <Route path="/admin/settings" component={SystemSettingsPage} />
       <Route path={"/dealer/login"} component={DealerLogin} />
       <Route path={"/dealer/dashboard"} component={DealerDashboard} />
       <Route path={"/dealer/set-password"} component={SetPassword} />
