@@ -155,6 +155,31 @@ pnpm build            # 构建生产版本
 - [ ] 富文本编辑器
 - [ ] 操作日志审计
 
+## 🚀 CI/CD (GitHub Actions)
+
+本项目已配置自动化CI/CD流程:
+
+- **CI流程** (`.github/workflows/ci.yml`) - 自动执行 install / lint / typecheck / test / build
+- **CD流程** (`.github/workflows/deploy-tencent.yml`) - push到main分支自动部署到腾讯云
+
+### GitHub Secrets配置
+
+需要在GitHub仓库配置以下Secrets (Settings → Secrets and variables → Actions):
+
+- `TC_HOST` - 腾讯云服务器公网IP/域名
+- `TC_PORT` - SSH端口 (通常22)
+- `TC_USER` - 部署用户 (建议非root)
+- `TC_SSH_PRIVATE_KEY` - 部署用户的SSH私钥 (OpenSSH格式)
+- `TC_DEPLOY_PATH` - 部署目录 (例: `/opt/rebate-system`)
+
+## 📚 文档
+
+- [🛠️ 技术设计文档](./docs/TECHNICAL_DESIGN.md) - 架构设计、模块说明、安全设计
+- [📝 轻量级后台管理面板操作手册](./docs/ADMIN_PANEL_USER_GUIDE.md) - 详细的用户操作指南
+- [🚀 腾讯云部署指南](./DEPLOYMENT_GUIDE.md) - 小白版部署教程
+- [⚡ 快速启动指南](./QUICK_START.md) - 5分钟快速上手
+- [✅ 部署检查清单](./DEPLOYMENT_CHECKLIST.md) - 部署前检查项
+
 ## 🤝 贡献
 
 欢迎提交Issue和Pull Request!
